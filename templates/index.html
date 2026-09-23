@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{title}}</title>
+  <style>{{styles}}</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><strong>strace-viewer</strong><span id="capture-status">No trace loaded</span></div>
+    <label class="file-picker">Open trace<input id="trace-input" type="file" multiple accept=".trace,.log,.txt,*/*"></label>
+    <button id="follow-button" type="button" aria-pressed="true">Follow tail</button>
+  </header>
+  <main>
+    <aside class="controls" aria-label="Trace filters">
+      <label>Search<input id="search" type="search" placeholder="Payload, arguments, or raw trace"></label>
+      <div class="options"><label><input id="case-sensitive" type="checkbox"> Case sensitive</label><label><input id="regex" type="checkbox"> Regular expression</label></div>
+      <label>PID<input id="pid-filter" inputmode="numeric" placeholder="e.g. 4182"></label>
+      <label>FD<input id="fd-filter" inputmode="numeric" placeholder="e.g. 7"></label>
+      <label>Syscall<input id="syscall-filter" placeholder="e.g. write or read*"></label>
+      <label><input id="io-only" type="checkbox"> I/O calls only</label>
+      <button id="clear-filters" type="button">Clear filters</button>
+      <p id="match-summary" class="summary">0 events</p>
+      <p class="keys"><kbd>j</kbd>/<kbd>k</kbd> step · <kbd>n</kbd>/<kbd>N</kbd> search · <kbd>[</kbd>/<kbd>]</kbd> descriptor · <kbd>/</kbd> search</p>
+    </aside>
+    <section class="trace-pane" aria-label="Trace events">
+      <div class="table-head" role="row"><span>TIME</span><span>PID</span><span>SYSCALL</span><span>FD</span><span>RESULT</span><span>DATA</span></div>
+      <div id="event-scroller" tabindex="0" role="grid" aria-label="Trace event list"><div id="event-spacer"><div id="event-rows"></div></div></div>
+    </section>
+    <aside id="inspector" class="inspector" aria-live="polite" hidden></aside>
+  </main>
+  <script>{{script}}</script>
+</body>
+</html>

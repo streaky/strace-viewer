@@ -1,0 +1,25 @@
+namespace strace-format
+
+from /core/collections import list
+
+public class trace-event
+    raw string = ''
+    line-number int = 0
+    pid string|none = none
+    timestamp string|none = none
+    syscall string|none = none
+    result string|none = none
+    duration string|none = none
+    parse-status string = 'raw'
+
+    function construct; raw string, line-number int
+        this.raw = raw
+        this.line-number = line-number
+
+public class trace
+    source string = ''
+    events list of trace-event = list; (instance trace-event; '', 0)
+
+    function construct; source string, events list of trace-event
+        this.source = source
+        this.events = events

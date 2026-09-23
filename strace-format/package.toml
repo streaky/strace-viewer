@@ -1,0 +1,9 @@
+package = "strace-format"
+artifact = "library"
+rust-toolchain = "pinned"
+
+[namespaces]
+strace-format = "src"
+
+[testing]
+unit = "tests/unit"

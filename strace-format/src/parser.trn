@@ -1,0 +1,28 @@
+namespace strace-format
+
+
+public function parse-trace trace; source string
+    events list of trace-event = list; (instance trace-event; '', 0)
+    events.clear;
+    lines = source.split; '\n'
+    line-number int = 1
+    for raw-line in lines
+        line = raw-line.trim;
+        if line != ''
+            event = parse-event; (instance trace-event; raw-line, line-number)
+            events.append; event
+        line-number = line-number + 1
+    return instance trace; source, events
+
+public function parse-event trace-event; event trace-event
+    parts = event.raw.split; '('
+    if parts.length < 2
+        return event
+    call-prefix = parts[0].trim;
+    call-words = call-prefix.split; ' '
+    event.syscall = call-words[call-words.length - 1]
+    result-parts = parts[1].split; ') = '
+    if result-parts.length == 2
+        event.result = result-parts[1]
+    event.parse-status = 'parsed'
+    return event

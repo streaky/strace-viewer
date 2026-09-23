@@ -1,0 +1,23 @@
+:root { color-scheme: dark; font: 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: #10141c; color: #e6edf3; }
+* { box-sizing: border-box; } body { margin: 0; min-width: 980px; } header { height: 54px; display: flex; gap: 16px; align-items: center; padding: 0 18px; border-bottom: 1px solid #2d3748; background: #161b22; } .brand { display: flex; gap: 12px; align-items: baseline; margin-right: auto; } .brand strong { color: #7ee787; font-size: 16px; } .brand span, .summary, .keys { color: #9da7b3; } button, .file-picker { border: 1px solid #3b4a5e; border-radius: 5px; padding: 7px 10px; background: #202936; color: inherit; cursor: pointer; } .file-picker input { display: none; } main { display: grid; grid-template-columns: 250px minmax(500px, 1fr) 390px; height: calc(100vh - 54px); } aside { padding: 14px; overflow: auto; background: #161b22; } .controls { border-right: 1px solid #2d3748; } .inspector { border-left: 1px solid #2d3748; } label { display: block; margin: 0 0 12px; color: #b7c1cc; } input { width: 100%; margin-top: 4px; padding: 7px; border: 1px solid #3b4a5e; border-radius: 4px; color: inherit; background: #0d1117; font: inherit; } .options { display: flex; gap: 12px; flex-wrap: wrap; } .options label, .controls > label:has(input[type=checkbox]) { display: flex; gap: 6px; align-items: center; } input[type=checkbox] { width: auto; margin: 0; } .trace-pane { min-width: 0; display: flex; flex-direction: column; } .table-head, .event-row { display: grid; grid-template-columns: 112px 76px 104px 48px 90px minmax(200px, 1fr); column-gap: 8px; align-items: center; padding: 0 12px; white-space: nowrap; overflow: hidden; } .table-head { height: 32px; color: #8b949e; border-bottom: 1px solid #2d3748; font-size: 12px; } #event-scroller { overflow: auto; flex: 1; outline: none; } #event-spacer { position: relative; } #event-rows { position: absolute; inset: 0; } .event-row { position: absolute; width: 100%; height: 28px; border: 0; border-bottom: 1px solid #1d2632; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; } .event-row:hover, .event-row.selected { background: #243247; } .event-row mark { background: #e3b341; color: #111; padding: 0; } .payload { overflow: hidden; text-overflow: ellipsis; } h2 { margin-top: 0; font-size: 15px; } dl { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; } dt { color: #8b949e; } dd { margin: 0; word-break: break-word; } pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 10px; background: #0d1117; border: 1px solid #2d3748; border-radius: 5px; } .tabs { display: flex; gap: 6px; margin: 14px 0 8px; } .tabs button.active { border-color: #58a6ff; color: #58a6ff; } kbd { border: 1px solid #57606a; border-radius: 3px; padding: 1px 3px; color: #c9d1d9; }
+
+main { grid-template-columns: 250px minmax(500px, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+.controls { grid-column: 1; grid-row: 1; }
+.trace-pane { grid-column: 2; grid-row: 1; }
+.inspector { grid-column: 1 / -1; grid-row: 2; height: 260px; min-height: 160px; max-height: calc(100vh - 54px); resize: vertical; overflow: auto; border-top: 1px solid #2d3748; border-left: 0; }
+.inspector[hidden] { display: none; }
+
+.inspector { display: grid; grid-template-rows: 10px minmax(0, 1fr); padding: 0; resize: none; overflow: hidden; }
+#inspector-resizer { cursor: ns-resize; background: linear-gradient(#273548, #1a2431); border-bottom: 1px solid #3b4a5e; touch-action: none; }
+#inspector-resizer:hover, #inspector-resizer:focus { background: #3b82b6; outline: 0; }
+.inspector-content { display: grid; grid-template-columns: minmax(230px, 360px) minmax(0, 1fr); min-height: 0; overflow: hidden; }
+.event-summary { padding: 14px; overflow: auto; border-right: 1px solid #2d3748; }
+.event-detail { padding: 14px; overflow: auto; min-width: 0; }
+.event-detail h3:first-child { margin-top: 0; }
+
+header .file-picker { display: inline-flex; align-items: center; margin: 0; }
+
+.table-head, .event-row { grid-template-columns: 150px 76px 104px 48px 90px minmax(200px, 1fr); }
+
+.event-row > span { min-width: 0; overflow: hidden; text-overflow: clip; }
+.event-row > span.payload { text-overflow: ellipsis; }

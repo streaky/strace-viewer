@@ -1,0 +1,21 @@
+namespace strace-viewer
+
+public function replace-slot string; subject string, name string, value string
+    marker = '{{'.concat; name, '}}'
+    return subject.replace; marker, value
+
+public function encode-source-script string; value string
+    escaped = value.replace; '\\', '\\\\'
+    escaped = escaped.replace; '"', '\\"'
+    escaped = escaped.replace; '\r', '\\r'
+    escaped = escaped.replace; '\n', '\\n'
+    escaped = escaped.replace; '</script', '<\\/script'
+    return 'window.__STRACE_SOURCE__ = "'.concat; escaped, '";'
+
+public function render-page string; page string, styles string, script string, source string
+    rendered = replace-slot; page, 'title', 'strace-viewer'
+    rendered = replace-slot; rendered, 'styles', styles
+    source-script = encode-source-script; source
+    script-with-source = source-script.concat; '\n', script
+    rendered = replace-slot; rendered, 'script', script-with-source
+    return rendered

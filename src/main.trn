@@ -1,0 +1,37 @@
+namespace strace-viewer
+
+from /core/process import arguments, exit, make-exit-status
+from /strace-format import parse-trace
+
+function fail; message string
+    print; 'strace-viewer: ', message
+    exit; (make-exit-status; 1)
+
+
+function main;
+    supplied = arguments;
+    if supplied.length != 2
+        fail; 'usage: strace-viewer <trace-file> <output.html>'
+        return
+    if not supplied[0].is-text or not supplied[1].is-text
+        fail; 'all command-line arguments must be Unicode text'
+        return
+    trace-path = supplied[0].text
+    output-path = supplied[1].text
+    trace-source = read-text; trace-path
+    if trace-source.failed
+        fail; trace-source.message
+        return
+    page-template = read-text; 'templates/index.html'
+    style-template = read-text; 'templates/viewer.css'
+    script-template = read-text; 'templates/viewer.js'
+    if page-template.failed or style-template.failed or script-template.failed
+        fail; 'cannot read templates; run from the strace-viewer project directory'
+        return
+    capture = parse-trace; trace-source.content
+    rendered = render-page; page-template.content, style-template.content, script-template.content, capture.source
+    output = write-text; output-path, rendered
+    if output.failed
+        fail; output.message
+        return
+    print; 'strace-viewer: wrote ', output-path, ' with ', capture.events.length, ' events'

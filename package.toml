@@ -1,0 +1,24 @@
+package = "strace-viewer"
+artifact = "executable"
+rust-toolchain = "pinned"
+
+[profile]
+name = "strace-viewer"
+capabilities = ["filesystem", "process", "threads", "build"]
+
+[namespaces]
+strace-viewer = "src"
+
+[terrane-dependencies.strace-format]
+path = "strace-format"
+
+[rust-dependencies.tokio]
+version = "=1.47.1"
+features = ["rt-multi-thread"]
+effects = ["build", "threads"]
+
+[testing]
+unit = "tests/unit"
+
+[testing.profile]
+capabilities = ["filesystem", "process", "build"]

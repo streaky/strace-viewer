@@ -1,0 +1,12 @@
+namespace strace-format
+
+from /core/testing import assert-equal-int, assert-equal-string, test-failure
+
+function test-parser-keeps-raw-lines-and-ordinary-syscalls none throws test-failure;
+    source = '4182 write(7, "POST /api", 9) = 9\n4182 close(7) = 0\nmalformed trace text'
+    capture = parse-trace; source
+    assert-equal-int; capture.events.length, 3
+    assert-equal-string; capture.events[0].parse-status, 'parsed'
+    assert-equal-string; capture.events[2].raw, 'malformed trace text'
+    assert-equal-string; capture.events[2].parse-status, 'raw'
+    return none

@@ -1,0 +1,34 @@
+namespace strace-viewer
+
+from /core/errors import decode-error
+from /core/filesystem/paths import path
+from /core/filesystem import filesystem-capability, filesystem-read-bounded, filesystem-write-atomic
+
+public class text-load
+    failed bool = false
+    message string = ''
+    content string = ''
+
+public function read-text text-load; location string
+    result = instance text-load;
+    authority = filesystem-capability;
+    data = filesystem-read-bounded; authority, (instance path; location), 268435456
+    if data.failed
+        result.failed = true
+        result.message = data.message
+        return result
+    try
+        result.content = data.data.decode; utf8
+    catch decode-error
+        result.failed = true
+        result.message = 'file is not valid UTF-8: '.concat; location
+    return result
+
+public function write-text text-load; location string, content string
+    result = instance text-load;
+    authority = filesystem-capability;
+    written = filesystem-write-atomic; authority, (instance path; location), (content.encode; utf8)
+    if written.failed
+        result.failed = true
+        result.message = written.message
+    return result
