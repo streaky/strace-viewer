@@ -1,9 +1,9 @@
-package = "strace-format"
+package = "streaky/strace-format"
 artifact = "library"
 rust-toolchain = "pinned"
 
 [namespaces]
-strace-format = "src"
+"streaky/strace-format" = "src"
 
 [testing]
 unit = "tests/unit"

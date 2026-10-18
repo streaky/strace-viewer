@@ -1,4 +1,4 @@
-namespace strace-format
+namespace streaky/strace-format
 
 from /core/collections import list
 

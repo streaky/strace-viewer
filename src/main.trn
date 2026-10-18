@@ -1,7 +1,7 @@
 namespace strace-viewer
 
 from /core/process import arguments, exit, make-exit-status
-from /strace-format import parse-trace
+from /streaky/strace-format import parse-trace
 
 function fail; message string
     print; 'strace-viewer: ', message

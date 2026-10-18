@@ -9,7 +9,7 @@ capabilities = ["filesystem", "process", "threads", "build"]
 [namespaces]
 strace-viewer = "src"
 
-[terrane-dependencies.strace-format]
+[terrane-dependencies.streaky.strace-format]
 path = "strace-format"
 
 [rust-dependencies.tokio]

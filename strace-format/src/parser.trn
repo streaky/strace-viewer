@@ -1,4 +1,4 @@
-namespace strace-format
+namespace streaky/strace-format
 
 
 public function parse-trace trace; source string

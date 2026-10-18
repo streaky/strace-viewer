@@ -2,6 +2,8 @@
 
 `strace-viewer` turns a captured Linux `strace` into a self-contained browser explorer. It is a Terrane application: Terrane reads the trace and assembles the browser document from the HTML, CSS, and JavaScript templates in `templates/`.
 
+The reusable parser library is `streaky/strace-format`: the application declares it under `[terrane-dependencies.streaky.strace-format]` and imports it from `/streaky/strace-format`.
+
 The generated document keeps the trace on the local machine. It embeds the source trace, so it can be opened directly in a browser or sent to someone only if the trace itself is safe to share.
 
 ## Build and open a captured trace
