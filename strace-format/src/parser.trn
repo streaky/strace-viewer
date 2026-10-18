@@ -2,8 +2,7 @@ namespace streaky/strace-format
 
 
 public function parse-trace trace; source string
-    events list of trace-event = list; (instance trace-event; '', 0)
-    events.clear;
+    events list of trace-event = list;
     lines = source.split; '\n'
     line-number int = 1
     for raw-line in lines
@@ -11,7 +10,7 @@ public function parse-trace trace; source string
         if line != ''
             event = parse-event; (instance trace-event; raw-line, line-number)
             events.append; event
-        line-number = line-number + 1
+        line-number++
     return instance trace; source, events
 
 public function parse-event trace-event; event trace-event

@@ -1,10 +1,11 @@
 namespace strace-viewer
 
 from /core/process import arguments, exit, make-exit-status
+from /core/errors import throwable
 from /streaky/strace-format import parse-trace
 
 function fail; message string
-    print; 'strace-viewer: ', message
+    print; 'strace-viewer: ' + message
     exit; (make-exit-status; 1)
 
 
@@ -22,16 +23,14 @@ function main;
     if trace-source.failed
         fail; trace-source.message
         return
-    page-template = read-text; 'templates/index.html'
-    style-template = read-text; 'templates/viewer.css'
-    script-template = read-text; 'templates/viewer.js'
-    if page-template.failed or style-template.failed or script-template.failed
-        fail; 'cannot read templates; run from the strace-viewer project directory'
-        return
     capture = parse-trace; trace-source.content
-    rendered = render-page; page-template.content, style-template.content, script-template.content, capture.source
+    try
+        rendered = render-page; capture.source
+    catch throwable as error
+        fail; error.message
+        return
     output = write-text; output-path, rendered
     if output.failed
         fail; output.message
         return
-    print; 'strace-viewer: wrote ', output-path, ' with ', capture.events.length, ' events'
+    print; 'strace-viewer: wrote ' + output-path + ' with ' + capture.events.length + ' events'

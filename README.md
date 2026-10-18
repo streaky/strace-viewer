@@ -1,6 +1,6 @@
 # strace-viewer
 
-`strace-viewer` turns a captured Linux `strace` into a self-contained browser explorer. It is a Terrane application: Terrane reads the trace and assembles the browser document from the HTML, CSS, and JavaScript templates in `templates/`.
+`strace-viewer` turns a captured Linux `strace` into a self-contained browser explorer. It is a Terrane application: Terrane reads the trace and renders the browser document with `streaky/template` from the HTML, CSS, and JavaScript in `templates/`.
 
 The reusable parser library is `streaky/strace-format`: the application declares it under `[terrane-dependencies.streaky.strace-format]` and imports it from `/streaky/strace-format`.
 
@@ -8,15 +8,16 @@ The generated document keeps the trace on the local machine. It embeds the sourc
 
 ## Build and open a captured trace
 
-Build the native executable, then run that executable from this project directory so it can load the file-based templates:
+Build the template consumer once, then build the native executable and render a trace:
 
 ```bash
+TERRANE="$PWD/../../target/release/terrane" sh ../../packages/template/build-consumer.sh
 viewer=$(../../target/release/terrane build .)
 "$viewer" trace.log viewer.html
 xdg-open viewer.html
 ```
 
-`terrane build` prints the native artifact path. The binary deliberately reads `templates/index.html`, `templates/viewer.css`, and `templates/viewer.js` relative to its current working directory, so build it once and invoke the resulting binary here for subsequent traces.
+`terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates, and rebuild the consumer after changing `packages/template` itself.
 
 For iterative Terrane development, the equivalent one-shot command is:
 
@@ -25,6 +26,22 @@ For iterative Terrane development, the equivalent one-shot command is:
 ```
 
 The viewer provides drag-and-drop and file selection as well, but rendering a trace into the document is the most portable option: the selected trace is already present when the page opens.
+
+## Rendering and verification
+
+The application declares the local template package under `[terrane-dependencies.streaky.template]`. Its `[consumers.template]` configuration generates the engine factory at build time; generated source stays under `.trn/`.
+
+The HTML template retains normal autoescaping for text such as the title. The trace is encoded as a JSON string with `/core/documents::make-document-string`, then every `<` is escaped as `\u003c` before that JSON is inserted with `|safe` in the script element. This keeps control characters, Unicode, quotes, template delimiters, and HTML-looking trace data intact without allowing a trace to close the script element. CSS and JavaScript are trusted, compiled includes, not trace-supplied markup.
+
+The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. The application no longer pins Tokio or requests thread/build capabilities for ordinary execution; generated runtime dependencies remain compiler-owned.
+
+Run the focused rendering and parser suites from this directory after building the consumer:
+
+```bash
+../../target/release/terrane test .
+../../target/release/terrane test strace-format
+```
+
 
 ## Capture a new program
 

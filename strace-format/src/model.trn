@@ -18,7 +18,7 @@ public class trace-event
 
 public class trace
     source string = ''
-    events list of trace-event = list; (instance trace-event; '', 0)
+    events list of trace-event
 
     function construct; source string, events list of trace-event
         this.source = source

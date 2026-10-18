@@ -4,7 +4,7 @@ rust-toolchain = "pinned"
 
 [profile]
 name = "strace-viewer"
-capabilities = ["filesystem", "process", "threads", "build"]
+capabilities = ["filesystem", "process"]
 
 [namespaces]
 strace-viewer = "src"
@@ -12,10 +12,13 @@ strace-viewer = "src"
 [terrane-dependencies.streaky.strace-format]
 path = "strace-format"
 
-[rust-dependencies.tokio]
-version = "=1.47.1"
-features = ["rt-multi-thread"]
-effects = ["build", "threads"]
+[terrane-dependencies.streaky.template]
+path = "../../packages/template"
+
+[consumers.template]
+command = "../../packages/template/.trn/consumers/template"
+args = ["--namespace", "generated/template/strace-viewer", "--root", "templates", "--template", "index.html"]
+declarations = ["/strace-viewer::main"]
 
 [testing]
 unit = "tests/unit"

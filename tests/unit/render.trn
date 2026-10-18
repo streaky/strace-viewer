@@ -1,0 +1,18 @@
+namespace strace-viewer
+
+from /core/documents/json import parse-json, default-json-options
+from /core/testing import assert-equal-bool, assert-equal-int, assert-equal-string
+
+function test-trace-source-remains-data-in-html;
+    source = '</ScRiPt><script>window.injected = true</script><!-- {{title}} & "quoted" \\path\n\r\t\0\u{0001}\u{0008}\u{000b}\u{000c} café 🪨\u{2028}\u{2029}'
+    page = render-page; source
+    # The HTML parser must see only the viewer's script, never one from the trace.
+    assert-equal-int; ((page.lower;).split; '</script>').length, 2
+    script = (page.split; '<script>')[1]
+    assignment = (script.split; '\n')[0]
+    encoded = assignment.trim.start; 'window.__STRACE_SOURCE__ = '
+    encoded = encoded.trim.end; ';'
+    decoded = parse-json; encoded, (default-json-options;)
+    assert-equal-bool; decoded.failed, false
+    assert-equal-string; decoded.value.kind, 'string'
+    assert-equal-string; decoded.value.scalar, source

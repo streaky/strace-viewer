@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{title}}</title>
-  <style>{{styles}}</style>
+  <style>{% include 'viewer.css' %}</style>
 </head>
 <body>
   <header>
@@ -30,6 +30,7 @@
     </section>
     <aside id="inspector" class="inspector" aria-live="polite" hidden></aside>
   </main>
-  <script>{{script}}</script>
+  <script>window.__STRACE_SOURCE__ = {{source|safe}};
+{% include 'viewer.js' %}</script>
 </body>
 </html>

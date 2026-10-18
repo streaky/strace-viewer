@@ -21,7 +21,7 @@ public function read-text text-load; location string
         result.content = data.data.decode; utf8
     catch decode-error
         result.failed = true
-        result.message = 'file is not valid UTF-8: '.concat; location
+        result.message = 'file is not valid UTF-8: ' + location
     return result
 
 public function write-text text-load; location string, content string
