@@ -9,16 +9,16 @@ function fail; message string
     exit; (make-exit-status; 1)
 
 
-function main;
+async function main;
     supplied = arguments;
-    if supplied.length != 2
-        fail; 'usage: strace-viewer <trace-file> <output.html>'
+    if supplied.length < 1 or supplied.length > 2
+        fail; 'usage: strace-viewer <trace-file> [output.html]'
         return
-    if not supplied[0].is-text or not supplied[1].is-text
-        fail; 'all command-line arguments must be Unicode text'
-        return
+    for argument in supplied
+        if not argument.is-text
+            fail; 'all command-line arguments must be Unicode text'
+            return
     trace-path = supplied[0].text
-    output-path = supplied[1].text
     trace-source = read-text; trace-path
     if trace-source.failed
         fail; trace-source.message
@@ -26,9 +26,13 @@ function main;
     capture = parse-trace; trace-source.content
     try
         rendered = render-page; capture.source
+        if supplied.length == 1
+            await serve-viewer; rendered
+            return
     catch throwable as error
         fail; error.message
         return
+    output-path = supplied[1].text
     output = write-text; output-path, rendered
     if output.failed
         fail; output.message

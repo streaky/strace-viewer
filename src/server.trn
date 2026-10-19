@@ -1,0 +1,65 @@
+namespace strace-viewer
+
+from /core/codecs import encode-base64
+from /core/networking import listen-tcp
+from /core/random import secure-random
+from /streaky/http-server import api, create-application, http-error
+from /streaky/http-server/annotations import endpoint, route-group, query
+from /generated/http-server import annotated-group0
+
+# Controller copies share this immutable page; only a GET response copies its body.
+class viewer-page
+    private text string = ''
+    private size int = 0
+
+    function construct; text string
+        this.size = text.bytes.length
+        this.text = text
+
+    function content string;
+        return this.text
+
+    function byte-length int;
+        return this.size
+
+@[route-group; prefix = '/', document = false]
+class viewer-site uses api
+    private access-key string = ''
+    private page shared ref viewer-page
+
+    function construct; page string = '', access-key string = ''
+        this.page = shared ref (instance viewer-page; page)
+        this.access-key = access-key
+
+    @[endpoint; method = 'GET|HEAD', path = '/', content-type = 'text/html']
+    async function home string|none; @[query;] key string = ''
+        if this.access-key == '' or key != this.access-key
+            throw http-error; 403, 'Access key required'
+        page = this.page
+        response = this.response
+        if response != none
+            response.set-header; 'Cache-Control', 'no-store'
+            response.set-header; 'Referrer-Policy', 'no-referrer'
+            request = this.request
+            if request != none
+                if (request.method;) == 'HEAD'
+                    response.set-status; 200
+                    response.set-content-length; (page.byte-length;)
+                    response.set-content-type; 'text/html'
+                    return none
+        return page.content;
+
+async function serve-viewer; page string
+    random = instance secure-random;
+    generated = random.generate-bytes; 9
+    if generated.failed
+        fail; 'cannot generate access key: ' + generated.message
+        return
+    # Nine random bytes encode to exactly twelve URL-safe characters, without padding.
+    access-key = encode-base64; generated.value, true, false
+    app = create-application;
+    app = app.mount; '/', (instance annotated-group0; (instance viewer-site; page, access-key))
+    listener = await listen-tcp; '127.0.0.1:0'
+    print; 'strace-viewer: http://' + listener.local-address + '/?key=' + access-key
+    print; 'Press Ctrl-C to stop.'
+    await app.serve-listener; move listener

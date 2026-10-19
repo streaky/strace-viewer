@@ -1,45 +1,60 @@
 # strace-viewer
 
-`strace-viewer` turns a captured Linux `strace` into a self-contained browser explorer. It is a Terrane application: Terrane reads the trace and renders the browser document with `streaky/template` from the HTML, CSS, and JavaScript in `templates/`.
+`strace-viewer` turns a captured Linux `strace` into a browser explorer served locally by `streaky/http-server`. It is a Terrane application: Terrane reads the trace and renders the browser document with `streaky/template` from the HTML, CSS, and JavaScript in `templates/`.
 
 The reusable parser library is `streaky/strace-format`: the application declares it under `[terrane-dependencies.streaky.strace-format]` and imports it from `/streaky/strace-format`.
 
-The generated document keeps the trace on the local machine. It embeds the source trace, so it can be opened directly in a browser or sent to someone only if the trace itself is safe to share.
+The trace stays on the local machine. By default the viewer runs a loopback-only HTTP server and prints a URL containing a fresh 12-character access key. An explicit second argument exports a self-contained HTML file instead; share either the URL or an exported document only if the trace is safe to share.
 
 ## Build and open a captured trace
 
-Build the template consumer once, then build the native executable and render a trace:
+Build the HTTP and template consumers, then build the native executable and serve a trace:
 
 ```bash
-TERRANE="$PWD/../../target/release/terrane" sh ../../packages/template/build-consumer.sh
+TERRANE="$PWD/../../target/release/terrane" sh ../../packages/http-server/build-consumer.sh
 viewer=$(../../target/release/terrane build .)
-"$viewer" trace.log viewer.html
-xdg-open viewer.html
+"$viewer" trace.log
 ```
 
-`terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates, and rebuild the consumer after changing `packages/template` itself.
+Open the URL printed in the console. The server binds `127.0.0.1:0`, so the operating system chooses an available unprivileged port; the viewer reads that listener's actual address and hands the same listener to the HTTP server. No root privileges or configured port are needed. Stop it with `Ctrl-C`.
+
+The `?key=...` value is a new random 12-character URL-safe string each time the server starts. Requests with a missing or incorrect key receive HTTP 403. There are no cookies, login sessions, or public-network listeners; this is a simple local access gate, not an Internet-facing authentication system. Authorized pages are marked `no-store` and do not send referrers. Treat the console URL and browser history as sensitive.
+
+`terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates, and rebuild the consumers after changing their packages.
 
 For iterative Terrane development, the equivalent one-shot command is:
 
 ```bash
-../../target/release/terrane run . -- trace.log viewer.html
+../../target/release/terrane run . -- trace.log
 ```
 
 The viewer provides drag-and-drop and file selection as well, but rendering a trace into the document is the most portable option: the selected trace is already present when the page opens.
 
+### Explicit HTML export
+
+Supply the output filename as the second argument to write a portable document and exit without starting a server:
+
+```bash
+"$viewer" trace.log viewer.html
+xdg-open viewer.html
+```
+
+Exported files embed the trace without an access-key check; anyone who can read the file can inspect it.
+
 ## Rendering and verification
 
-The application declares the local template package under `[terrane-dependencies.streaky.template]`. Its `[consumers.template]` configuration generates the engine factory at build time; generated source stays under `.trn/`.
+The application declares local `streaky/template` and `streaky/http-server` dependencies. Their explicit consumers generate the template engine factory and class-bound HTTP adapter at build time; generated source stays under `.trn/`.
 
 The HTML template retains normal autoescaping for text such as the title. The trace is encoded as a JSON string with `/core/documents::make-document-string`, then every `<` is escaped as `\u003c` before that JSON is inserted with `|safe` in the script element. This keeps control characters, Unicode, quotes, template delimiters, and HTML-looking trace data intact without allowing a trace to close the script element. CSS and JavaScript are trusted, compiled includes, not trace-supplied markup.
 
-The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. The application no longer pins Tokio or requests thread/build capabilities for ordinary execution; generated runtime dependencies remain compiler-owned.
+The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, and the build effect required by the HTTP dependency.
 
-Run the focused rendering and parser suites from this directory after building the consumer:
+Run the focused rendering, parser, and real-HTTP suites from this directory after building the consumers and viewer:
 
 ```bash
 ../../target/release/terrane test .
 ../../target/release/terrane test strace-format
+python tests/integration/test_server.py "$viewer"
 ```
 
 
@@ -54,8 +69,7 @@ sudo strace \
   -- ./your-program --with-arguments
 sudo chown "$USER":"$(id -gn)" trace.log
 
-"$viewer" trace.log viewer.html
-xdg-open viewer.html
+"$viewer" trace.log
 ```
 
 The `-o` option is important: it keeps the trace separate from the program's ordinary standard output and standard error. Increase `-s 65535` if the application writes larger request bodies or other payloads that you need to inspect. No `strace` option can recover bytes that the kernel call did not capture or that `strace` truncated.
@@ -106,4 +120,4 @@ Processes may exit or spawn while this list is being assembled; that is normal. 
 
 ## Current scope
 
-The current implementation is an offline captured-trace explorer. Its source layout intentionally separates the reusable `strace-format/` Terrane library, the CLI/rendering code in `src/`, and browser templates in `templates/` so the next live local-bridge/WebSocket capture slice can use the same trace model without replacing the browser or parser boundaries.
+The current implementation explores captured traces over a keyed local HTTP page or an explicit HTML export. Live stdin ingestion, launching `strace`, and WebSocket updates are not implemented. The reusable `strace-format/` library, CLI/HTTP/rendering code in `src/`, and browser templates remain separate so those future capabilities can reuse the same trace model.

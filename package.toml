@@ -4,7 +4,7 @@ rust-toolchain = "pinned"
 
 [profile]
 name = "strace-viewer"
-capabilities = ["filesystem", "process"]
+capabilities = ["filesystem", "process", "networking", "entropy", "build"]
 
 [namespaces]
 strace-viewer = "src"
@@ -15,13 +15,24 @@ path = "strace-format"
 [terrane-dependencies.streaky.template]
 path = "../../packages/template"
 
+[terrane-dependencies.streaky.http-server]
+path = "../../packages/http-server"
+
 [consumers.template]
 command = "../../packages/template/.trn/consumers/template"
 args = ["--namespace", "generated/template/strace-viewer", "--root", "templates", "--template", "index.html"]
 declarations = ["/strace-viewer::main"]
 
+[consumers.http-server]
+command = "../../packages/http-server/.trn/consumers/http-server"
+declarations = [
+    "/strace-viewer::viewer-site",
+    "/strace-viewer::viewer-site::home",
+    "/strace-viewer::viewer-site::home::key",
+]
+
 [testing]
 unit = "tests/unit"
 
 [testing.profile]
-capabilities = ["filesystem", "process", "build"]
+capabilities = ["filesystem", "process", "networking", "entropy", "build"]
