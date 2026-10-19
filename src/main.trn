@@ -1,6 +1,7 @@
 namespace strace-viewer
 
-from /core/process import arguments, exit, make-exit-status
+from /core/collections import list
+from /core/process import arguments, cli-schema, parse-command-line, make-exit-status, exit
 from /core/errors import throwable
 from /streaky/strace-format import parse-trace
 
@@ -9,32 +10,49 @@ function fail; message string
     exit; (make-exit-status; 1)
 
 
+function show-usage;
+    print; 'usage: strace-viewer [--bind IP] [--port PORT] <trace-file> [output.html]'
+    print; '  --bind IP    IPv4 or IPv6 interface to listen on (default: 127.0.0.1)'
+    print; '  --port PORT  Listen port, or 0 for an OS-assigned port (default: 0)'
+    print; '  --help, -h   Show this help'
+    print; 'Config: $XDG_CONFIG_HOME/strace-viewer/config.yaml or ~/.config/strace-viewer/config.yaml'
+    print; 'CLI options override config; an explicit output filename exports HTML instead.'
+
 async function main;
-    supplied = arguments;
+    schema = instance cli-schema; (list; 'flag:--help', 'flag:-h', 'value:--bind', 'value:--port')
+    options = parse-command-line; schema, (arguments;)
+    if options.diagnostic-messages.length > 0
+        fail; options.diagnostic-messages[0] + ' (see --help)'
+        return
+    if options.flags.length > 0
+        show-usage;
+        return
+    supplied = options.positionals
     if supplied.length < 1 or supplied.length > 2
-        fail; 'usage: strace-viewer <trace-file> [output.html]'
+        fail; 'usage: strace-viewer [--bind IP] [--port PORT] <trace-file> [output.html]'
         return
-    for argument in supplied
-        if not argument.is-text
-            fail; 'all command-line arguments must be Unicode text'
-            return
-    trace-path = supplied[0].text
-    trace-source = read-text; trace-path
-    if trace-source.failed
-        fail; trace-source.message
+    if supplied.length == 2 and options.option-names.length > 0
+        fail; '--bind and --port apply only to HTTP serving'
         return
-    capture = parse-trace; trace-source.content
     try
+        address string = ''
+        if supplied.length == 1
+            address = resolve-server-address; (load-viewer-config;), options
+        trace-path = supplied[0].text
+        trace-source = read-text; trace-path
+        if trace-source.failed
+            fail; trace-source.message
+            return
+        capture = parse-trace; trace-source.content
         rendered = render-page; capture.source
         if supplied.length == 1
-            await serve-viewer; rendered
+            await serve-viewer; rendered, address
             return
+        output-path = supplied[1].text
+        written = write-text; output-path, rendered
+        if written.failed
+            fail; written.message
+            return
+        print; 'strace-viewer: wrote ' + output-path + ' with ' + capture.events.length + ' events'
     catch throwable as error
         fail; error.message
-        return
-    output-path = supplied[1].text
-    output = write-text; output-path, rendered
-    if output.failed
-        fail; output.message
-        return
-    print; 'strace-viewer: wrote ' + output-path + ' with ' + capture.events.length + ' events'

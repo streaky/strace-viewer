@@ -49,7 +49,7 @@ class viewer-site uses api
                     return none
         return page.content;
 
-async function serve-viewer; page string
+async function serve-viewer; page string, address string
     random = instance secure-random;
     generated = random.generate-bytes; 9
     if generated.failed
@@ -59,7 +59,7 @@ async function serve-viewer; page string
     access-key = encode-base64; generated.value, true, false
     app = create-application;
     app = app.mount; '/', (instance annotated-group0; (instance viewer-site; page, access-key))
-    listener = await listen-tcp; '127.0.0.1:0'
+    listener = await listen-tcp; address
     print; 'strace-viewer: http://' + listener.local-address + '/?key=' + access-key
     print; 'Press Ctrl-C to stop.'
     await app.serve-listener; move listener

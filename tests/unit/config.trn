@@ -1,0 +1,53 @@
+namespace strace-viewer
+
+from /core/collections import list
+from /core/process import cli-schema, command-line, native-string, native-text, parse-command-line
+from /core/testing import assert-equal-bool, assert-equal-string
+
+function binding-options command-line; values list of string
+    supplied list of native-string = list;
+    for value in values
+        supplied.append; (native-text; value)
+    schema = instance cli-schema; (list; 'value:--bind', 'value:--port')
+    return parse-command-line; schema, supplied
+
+function required-config-path string; home string, xdg string
+    location = user-config-path; home, xdg
+    if location != none
+        return location
+    throw settings-error; 'expected a configuration path'
+
+function test-user-config-path-follows-xdg-precedence;
+    assert-equal-string; (required-config-path; '/home/test', '/config'), '/config/strace-viewer/config.yaml'
+    assert-equal-string; (required-config-path; '/home/test', ''), '/home/test/.config/strace-viewer/config.yaml'
+    assert-equal-string; (required-config-path; '/home/test', 'relative'), '/home/test/.config/strace-viewer/config.yaml'
+    assert-equal-bool; ((user-config-path; '', '') == none), true
+
+function test-server-options-override-config-independently;
+    config = parse-viewer-config; 'server: {bind: 127.0.0.2, port: 43123}'
+    no-options = instance command-line;
+    assert-equal-string; (resolve-server-address; config, no-options), '127.0.0.2:43123'
+    bind-only = binding-options; (list; '--bind', '0.0.0.0')
+    assert-equal-string; (resolve-server-address; config, bind-only), '0.0.0.0:43123'
+    port-only = binding-options; (list; '--port', '0')
+    assert-equal-string; (resolve-server-address; config, port-only), '127.0.0.2:0'
+    ipv6 = binding-options; (list; '--bind', '::1', '--port', '65535')
+    assert-equal-string; (resolve-server-address; config, ipv6), '[::1]:65535'
+
+function test-invalid-settings-do-not-fall-back-to-loopback;
+    no-options = instance command-line;
+    for source in (list; 'server: [', 'server: {bind: localhost}', 'server: {port: -1}', 'server: {port: 65536}', 'server: {port: "8080"}', 'server: {bind-ip: 0.0.0.0}')
+        rejected bool = false
+        try
+            resolve-server-address; (parse-viewer-config; source), no-options
+        catch settings-error
+            rejected = true
+        assert-equal-bool; rejected, true
+    config = instance viewer-config;
+    for value in (list; '-1', '65536', 'not-a-port')
+        rejected bool = false
+        try
+            resolve-server-address; config, (binding-options; (list; '--port', value))
+        catch settings-error
+            rejected = true
+        assert-equal-bool; rejected, true

@@ -4,7 +4,7 @@
 
 The reusable parser library is `streaky/strace-format`: the application declares it under `[terrane-dependencies.streaky.strace-format]` and imports it from `/streaky/strace-format`.
 
-The trace stays on the local machine. By default the viewer runs a loopback-only HTTP server and prints a URL containing a fresh 12-character access key. An explicit second argument exports a self-contained HTML file instead; share either the URL or an exported document only if the trace is safe to share.
+By default the viewer serves only this machine over loopback and prints a URL containing a fresh 12-character access key. You can opt into LAN serving with a bind option or user configuration. An explicit second argument exports a self-contained HTML file instead; share either the URL or an exported document only if the trace is safe to share.
 
 ## Build and open a captured trace
 
@@ -16,9 +16,9 @@ viewer=$(../../target/release/terrane build .)
 "$viewer" trace.log
 ```
 
-Open the URL printed in the console. The server binds `127.0.0.1:0`, so the operating system chooses an available unprivileged port; the viewer reads that listener's actual address and hands the same listener to the HTTP server. No root privileges or configured port are needed. Stop it with `Ctrl-C`.
+Open the URL printed in the console. Without configuration or options, the server binds `127.0.0.1:0`, so the operating system chooses an available unprivileged port; the viewer reads that listener's actual address and hands the same listener to the HTTP server. No root privileges or configured port are needed for this default. Stop it with `Ctrl-C`.
 
-The `?key=...` value is a new random 12-character URL-safe string each time the server starts. Requests with a missing or incorrect key receive HTTP 403. There are no cookies, login sessions, or public-network listeners; this is a simple local access gate, not an Internet-facing authentication system. Authorized pages are marked `no-store` and do not send referrers. Treat the console URL and browser history as sensitive.
+The `?key=...` value is a new random 12-character URL-safe string each time the server starts. Requests with a missing or incorrect key receive HTTP 403. There are no cookies or login sessions; this is a simple access gate, not an Internet-facing authentication system. Authorized pages are marked `no-store` and do not send referrers. Treat the console URL and browser history as sensitive.
 
 `terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates, and rebuild the consumers after changing their packages.
 
@@ -30,9 +30,35 @@ For iterative Terrane development, the equivalent one-shot command is:
 
 The viewer provides drag-and-drop and file selection as well, but rendering a trace into the document is the most portable option: the selected trace is already present when the page opens.
 
+### LAN serving and user configuration
+
+Override the bind IP and/or port for one run:
+
+```bash
+"$viewer" --bind 192.168.1.20 --port 8080 trace.log
+"$viewer" --bind 0.0.0.0 trace.log
+"$viewer" --bind ::1 --port 8080 trace.log
+```
+
+Use an IP assigned to the server to restrict listening to that interface. `0.0.0.0` listens on all IPv4 interfaces; `::` listens on the IPv6 wildcard address, with IPv4 acceptance depending on the host. For a wildcard address, replace the wildcard host in the printed URL with the server's LAN IP when opening it from another machine. IPv6 URLs include brackets automatically.
+
+For persistent settings, create `~/.config/strace-viewer/config.yaml` yourself. If `XDG_CONFIG_HOME` is set to an absolute path, the viewer uses `$XDG_CONFIG_HOME/strace-viewer/config.yaml` instead. Empty or relative `XDG_CONFIG_HOME` values fall back to `$HOME/.config`, following the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir/latest/). The viewer does not create config files or directories automatically.
+
+```yaml
+server:
+  bind: 192.168.1.20
+  port: 8080
+```
+
+Precedence is **CLI options > config file > built-in defaults**, independently for each setting. Omitted fields retain the defaults: `server.bind: 127.0.0.1` and `server.port: 0`. The bind value must be a numeric IPv4 or IPv6 address; port is an integer from 0 to 65535, with 0 requesting an OS-assigned port. A configured fixed port is used exactly—if it cannot be bound, startup fails rather than silently choosing another. Low ports may require additional operating-system privileges.
+
+The file must be a YAML mapping; unknown keys, invalid values, malformed YAML, and unreadable existing files stop serving with a diagnostic identifying the file. A missing file is normal. Configuration is loaded when the server starts, not watched for changes. `--help` lists the command-line options.
+
+LAN binding is opt-in and still requires the access key. HTTP is not encrypted: use a trusted local network and do not expose the viewer directly to the public Internet.
+
 ### Explicit HTML export
 
-Supply the output filename as the second argument to write a portable document and exit without starting a server:
+Supply the output filename as the second argument to write a portable document and exit without starting a server. Export and `--help` do not load server configuration; `--bind` and `--port` apply only to serving and cannot be combined with an output filename:
 
 ```bash
 "$viewer" trace.log viewer.html
@@ -120,4 +146,4 @@ Processes may exit or spawn while this list is being assembled; that is normal. 
 
 ## Current scope
 
-The current implementation explores captured traces over a keyed local HTTP page or an explicit HTML export. Live stdin ingestion, launching `strace`, and WebSocket updates are not implemented. The reusable `strace-format/` library, CLI/HTTP/rendering code in `src/`, and browser templates remain separate so those future capabilities can reuse the same trace model.
+The current implementation explores captured traces over a keyed HTTP page (loopback by default, with configurable LAN binding) or an explicit HTML export. Live stdin ingestion, launching `strace`, and WebSocket updates are not implemented. The reusable `strace-format/` library, CLI/HTTP/rendering code in `src/`, and browser templates remain separate so those future capabilities can reuse the same trace model.

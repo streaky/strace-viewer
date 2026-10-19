@@ -1,0 +1,88 @@
+namespace strace-viewer
+
+from /core/documents import document-decodable
+from /core/documents/yaml import decode-typed-yaml, default-yaml-options
+from /core/errors import throwable
+from /core/filesystem import filesystem-capability, filesystem-exists
+from /core/filesystem/paths import path
+from /core/networking import ip-address-from-string, socket-address-from-ip
+from /core/process import command-line, environment
+
+class settings-error implements throwable
+    message string = ''
+
+    function construct; message string
+        this.message = message
+
+    function render string;
+        return this.message
+
+class server-settings implements document-decodable
+    bind string = '127.0.0.1'
+    port uint16 = 0
+
+class viewer-config implements document-decodable
+    server server-settings = instance server-settings;
+
+function user-config-path string|none; home string, xdg-config-home string
+    if xdg-config-home.contains.start; '/'
+        return (xdg-config-home.trim.end; '/') + '/strace-viewer/config.yaml'
+    if home.contains.start; '/'
+        return (home.trim.end; '/') + '/.config/strace-viewer/config.yaml'
+    return none
+
+function parse-viewer-config viewer-config; source string
+    decoded = decode-typed-yaml; source, viewer-config, (default-yaml-options;), false
+    if decoded.failed
+        diagnostic = decoded.diagnostics[0]
+        throw settings-error; diagnostic.path + ': ' + diagnostic.message
+    return decoded.value
+
+function load-viewer-config viewer-config;
+    home string = ''
+    xdg-config-home string = ''
+    for entry in (environment;)
+        if entry.name.is-text and entry.value.is-text
+            if entry.name.text == 'HOME'
+                home = entry.value.text
+            else if entry.name.text == 'XDG_CONFIG_HOME'
+                xdg-config-home = entry.value.text
+    location = user-config-path; home, xdg-config-home
+    if location != none
+        exists = filesystem-exists; (filesystem-capability;), (instance path; location)
+        if exists.failed
+            throw settings-error; location + ': ' + exists.message
+        if not exists.exists
+            return instance viewer-config;
+        loaded = read-text; location
+        if loaded.failed
+            throw settings-error; location + ': ' + loaded.message
+        try
+            return parse-viewer-config; loaded.content
+        catch settings-error as error
+            throw settings-error; location + ': ' + error.message
+    return instance viewer-config;
+
+function resolve-server-address string; config viewer-config, options command-line
+    settings = config.server
+    index int = 0
+    while index < options.option-names.length
+        name = options.option-names[index]
+        value = options.option-values[index]
+        if not value.is-text
+            throw settings-error; name + ' must be Unicode text'
+        if name == '--bind'
+            settings.bind = value.text
+        else if name == '--port'
+            try
+                settings.port = value.text.radix; 10
+            catch throwable
+                throw settings-error; '--port must be an integer from 0 to 65535'
+        index++
+    address = ip-address-from-string; settings.bind
+    if address.failed
+        throw settings-error; 'server.bind must be an IPv4 or IPv6 address: ' + settings.bind
+    socket = socket-address-from-ip; address.value, settings.port
+    if socket.failed
+        throw settings-error; socket.message
+    return socket.value.value
