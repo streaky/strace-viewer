@@ -4,7 +4,7 @@ rust-toolchain = "pinned"
 
 [profile]
 name = "strace-viewer"
-capabilities = ["filesystem", "process", "networking", "entropy", "build"]
+capabilities = ["filesystem", "process", "networking", "entropy", "build", "threads"]
 
 [namespaces]
 strace-viewer = "src"
@@ -35,4 +35,4 @@ declarations = [
 unit = "tests/unit"
 
 [testing.profile]
-capabilities = ["filesystem", "process", "networking", "entropy", "build"]
+capabilities = ["filesystem", "process", "networking", "entropy", "build", "threads"]
