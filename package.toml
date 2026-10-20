@@ -18,6 +18,10 @@ path = "../../packages/template"
 [terrane-dependencies.streaky.http-server]
 path = "../../packages/http-server"
 
+[rust-dependencies.regress]
+version = "0.12.0"
+effects = ["build"]
+
 [consumers.template]
 command = "../../packages/template/.trn/consumers/template"
 args = ["--namespace", "generated/template/strace-viewer", "--root", "templates", "--template", "index.html"]

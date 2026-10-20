@@ -1,0 +1,146 @@
+namespace strace-viewer
+
+from /core/collections import list, range
+from /deps/regress import Regex as regular-expression, Match as expression-match
+
+class capture-row
+    id int = 0
+    line-number int = 0
+    raw string = ''
+    status string = 'raw'
+    syscall string = ''
+    args string = ''
+    result string = ''
+    actual string = ''
+    pid string = ''
+    timestamp string = ''
+    duration string = ''
+    fd string = ''
+    payload string = ''
+    truncated bool = false
+
+    function construct; id int, line-number int, raw string
+        this.id = id
+        this.line-number = line-number
+        this.raw = raw
+
+# Locate the call's closing delimiter without mistaking quoted/nested ')' for it.
+function call-close int; source bytes, start int, initial bool
+    expected list of uint8 = list;
+    if initial
+        expected.append; 41
+    quote uint8 = 0
+    escaped bool = false
+    index = start
+    while index < source.length
+        value = source[index]
+        if quote != 0
+            if escaped
+                escaped = false
+            else if value == 92
+                escaped = true
+            else if value == quote
+                quote = 0
+        else if value == 34 or value == 39
+            quote = value
+        else if value == 40
+            expected.append; 41
+        else if value == 91
+            expected.append; 93
+        else if value == 123
+            expected.append; 125
+        else if value == 41 or value == 93 or value == 125
+            if expected.length == 0
+                if value == 41
+                    return index
+            else
+                if expected[expected.length - 1] != value
+                    return -1
+                expected.remove; expected.length - 1
+                if initial and expected.length == 0
+                    return index
+        index++
+    return -1
+
+class row-decoder
+    private prefix regular-expression = regular-expression::new; '^(?:(?:\\[pid\\s+)?(\\d+(?:\\.\\d+)?)\\]?\\s+)?(?:(?:\\[pid\\s+)?(\\d+(?:\\.\\d+)?)\\]?\\s+)?([A-Za-z_][\\w]*)\\('
+    private resumed regular-expression = regular-expression::new; '^(?:(?:\\[pid\\s+)?(\\d+(?:\\.\\d+)?)\\]?\\s+)?(?:(?:\\[pid\\s+)?(\\d+(?:\\.\\d+)?)\\]?\\s+)?<\\.\\.\\.\\s+([A-Za-z_][\\w]*)\\s+resumed>\\s*,?\\s*'
+    private tail regular-expression = regular-expression::new; '^\\s+=\\s+(.*?)(?:\\s+<([\\d.]+)>\\s*)?$'
+    private descriptor regular-expression = regular-expression::new; '^(-?\\d+)(?:<[^>]*>)?'
+    private quoted regular-expression = regular-expression::new; '"((?:\\\\.|[^"\\\\])*)"'
+    private number regular-expression = regular-expression::new; '^-?\\d+'
+
+    function decode capture-row; id int, line-number int, raw string
+        row = instance capture-row; id, line-number, raw
+        text = raw.trim;
+        data = text.encode; utf8
+        found expression-match|none = this.prefix.find; text
+        resumed = false
+        if found == none
+            found = this.resumed.find; text
+            resumed = found != none
+        if found != none
+            start int = found.end;
+            prefix-text = found.as_str; text
+            first string = ''
+            second string = ''
+            syscall string = ''
+            if resumed
+                first = this.resumed.replace; prefix-text, '$1'
+                second = this.resumed.replace; prefix-text, '$2'
+                syscall = this.resumed.replace; prefix-text, '$3'
+            else
+                first = this.prefix.replace; prefix-text, '$1'
+                second = this.prefix.replace; prefix-text, '$2'
+                syscall = this.prefix.replace; prefix-text, '$3'
+            unfinished = not resumed and (text.contains.end; '<unfinished ...>')
+            args string = ''
+            result string = ''
+            duration string = ''
+            if unfinished
+                rest = data[range; start, data.length].decode; utf8
+                args = (rest.trim.end; '<unfinished ...>').trim.end;
+            else
+                close = call-close; data, start, not resumed
+                if close < 0
+                    return row
+                rest = data[range; close + 1, data.length].decode; utf8
+                ending = this.tail.find; rest
+                if ending == none
+                    return row
+                result = this.tail.replace; rest, '$1'
+                duration = this.tail.replace; rest, '$2'
+                args = data[range; start, close].decode; utf8
+            row.status = 'parsed'
+            row.syscall = syscall
+            if resumed
+                row.status = 'resumed'
+                row.syscall = '*' + syscall
+            if unfinished
+                row.status = 'unfinished'
+                row.syscall = '!' + syscall
+            if first.contains; '.'
+                row.timestamp = first
+            else
+                row.pid = first
+            if second.contains; '.'
+                row.timestamp = second
+            else if second != ''
+                row.pid = second
+            row.args = args
+            row.result = result
+            row.duration = duration
+            fd = this.descriptor.find; args
+            if fd != none
+                descriptor-text = fd.as_str; args
+                row.fd = this.descriptor.replace; descriptor-text, '$1'
+            quoted = this.quoted.find; args
+            if quoted != none
+                quoted-text = quoted.as_str; args
+                quoted-data = quoted-text.encode; utf8
+                row.payload = quoted-data[range; 1, quoted-data.length - 1].decode; utf8
+            actual = this.number.find; result
+            if actual != none
+                row.actual = actual.as_str; result
+            row.truncated = args.contains; '...'
+        return row

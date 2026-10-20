@@ -3,9 +3,10 @@ namespace strace-viewer
 from /core/codecs import encode-base64
 from /core/networking import listen-tcp
 from /core/random import secure-random
-from /streaky/http-server import api, create-application, http-error
+from /streaky/http-server import api, create-application, http-error, websocket-session
 from /streaky/http-server/annotations import endpoint, route-group, query
 from /generated/http-server import annotated-group0
+from /core/errors import throwable
 
 # Controller copies share this immutable page; only a GET response copies its body.
 class viewer-page
@@ -49,7 +50,9 @@ class viewer-site uses api
                     return none
         return page.content;
 
-async function serve-viewer; page string, address string
+async function serve-viewer; source string, address string
+    page = render-remote-page;
+    store = shared ref (instance capture-store; move source)
     random = instance secure-random;
     generated = random.generate-bytes; 9
     if generated.failed
@@ -59,6 +62,10 @@ async function serve-viewer; page string, address string
     access-key = encode-base64; generated.value, true, false
     app = create-application;
     app = app.mount; '/', (instance annotated-group0; (instance viewer-site; page, access-key))
+    handler async function from websocket-session to none throws throwable = async function; session websocket-session
+        await stream-capture; store, move session
+        return none
+    app = app.websocket; '/events/' + access-key, handler
     listener = await listen-tcp; address
     print; 'strace-viewer: http://' + listener.local-address + '/?key=' + access-key
     print; 'Press Ctrl-C to stop.'

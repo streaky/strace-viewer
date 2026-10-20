@@ -43,11 +43,11 @@ async function main;
         if trace-source.failed
             fail; trace-source.message
             return
+        if supplied.length == 1
+            await serve-viewer; trace-source.content, address
+            return
         capture = parse-trace; trace-source.content
         rendered = render-page; capture.source
-        if supplied.length == 1
-            await serve-viewer; rendered, address
-            return
         output-path = supplied[1].text
         written = write-text; output-path, rendered
         if written.failed

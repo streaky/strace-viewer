@@ -1,6 +1,10 @@
 
 .trn/
 
+# Python bytecode
+*.pyc
+__pycache__/
+
 trace.log
 viewer.html
 

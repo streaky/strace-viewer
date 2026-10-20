@@ -1,0 +1,25 @@
+namespace strace-viewer
+
+from /core/testing import assert-equal-string, assert-equal-int
+
+function test-decoder-preserves-nested-quoted-and-incomplete-calls;
+    decoder = instance row-decoder;
+    row = decoder.decode; 0, 2, '[pid 42] 123.456 write(7</tmp/file>, "café ) = quoted", nested([1, 2])) = 17 <0.001>'
+    assert-equal-string; row.status, 'parsed'
+    assert-equal-string; row.pid, '42'
+    assert-equal-string; row.timestamp, '123.456'
+    assert-equal-string; row.fd, '7'
+    assert-equal-string; row.payload, 'café ) = quoted'
+    assert-equal-string; row.result, '17'
+    assert-equal-string; row.duration, '0.001'
+    assert-equal-int; row.line-number, 2
+    unfinished = decoder.decode; 1, 3, '42 read(7, "waiting" <unfinished ...>'
+    assert-equal-string; unfinished.status, 'unfinished'
+    assert-equal-string; unfinished.syscall, '!read'
+    resumed = decoder.decode; 2, 4, '42 <... read resumed> "done", 4) = 4'
+    assert-equal-string; resumed.status, 'resumed'
+    assert-equal-string; resumed.syscall, '*read'
+    assert-equal-string; resumed.payload, 'done'
+    malformed = decoder.decode; 3, 5, '42 write(7, nested([1, 2}) = 1'
+    assert-equal-string; malformed.status, 'raw'
+    assert-equal-string; malformed.raw, '42 write(7, nested([1, 2}) = 1'

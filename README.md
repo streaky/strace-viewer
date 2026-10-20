@@ -1,6 +1,6 @@
 # strace-viewer
 
-`strace-viewer` turns a captured Linux `strace` into a browser explorer served locally by `streaky/http-server`. It is a Terrane application: Terrane reads the trace and renders the browser document with `streaky/template` from the HTML, CSS, and JavaScript in `templates/`.
+`strace-viewer` turns a captured Linux `strace` into a browser explorer. It is a Terrane application: the default HTTP response contains only the UI shell, with HTML, CSS, and JavaScript compiled by `streaky/template`. The browser requests decoded rows over an access-key-protected WebSocket as it needs them. Explicit HTML export remains self-contained and embeds its capture for offline use.
 
 The reusable parser library is `streaky/strace-format`: the application declares it under `[terrane-dependencies.streaky.strace-format]` and imports it from `/streaky/strace-format`.
 
@@ -22,13 +22,15 @@ The `?key=...` value is a new random 12-character URL-safe string each time the 
 
 `terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates, and rebuild the consumers after changing their packages.
 
+The viewer renders a small overscanned window of rows, highlights matches, and supports raw source inspection. HTTP serving, decoding, filters, and cross-capture navigation run in Terrane; the browser requests only the row windows it displays. Selecting an event opens a resizable inspector with a structured summary and text/hex views. Payload text is decoded when inspected and cached with the row. Text buffers open in text mode, while buffers containing binary/non-printable data default to hex; the toggle remains available for either.
+
 For iterative Terrane development, the equivalent one-shot command is:
 
 ```bash
 ../../target/release/terrane run . -- trace.log
 ```
 
-The viewer provides drag-and-drop and file selection as well, but rendering a trace into the document is the most portable option: the selected trace is already present when the page opens.
+The viewer also supports drag-and-drop and local file selection. Served captures are delivered on demand; explicit HTML export embeds a capture when a portable offline document is needed.
 
 ### LAN serving and user configuration
 
@@ -58,6 +60,7 @@ LAN binding is opt-in and still requires the access key. HTTP is not encrypted: 
 
 ### Explicit HTML export
 
+
 Supply the output filename as the second argument to write a portable document and exit without starting a server. Export and `--help` do not load server configuration; `--bind` and `--port` apply only to serving and cannot be combined with an output filename:
 
 ```bash
@@ -67,15 +70,35 @@ xdg-open viewer.html
 
 Exported files embed the trace without an access-key check; anyone who can read the file can inspect it.
 
+## On-demand capture delivery
+
+The server reads and decodes a captured file once and retains it in memory. This is on-demand **network delivery**, not file-backed paging or live stdin capture. Search and PID/FD/syscall/I/O filters run over the entire server-side capture, including rows the browser has never loaded. Regular-expression searches use an ECMAScript-compatible engine, including lookarounds.
+
+The browser requests the visible range plus a small overscan, with at most two row-window requests in flight. Each row includes its full payload and raw source—there is no separate payload chunking protocol. Decoded rows use a 2,048-entry cache; inspected text/hex representations are cached with their rows. Match-index mappings are also bounded, and a selected row remains available to the inspector. Returning to a cached viewport does not download those rows again.
+
+The WebSocket uses the same host and port as the page, at `/events/<access-key>`. Text JSON messages carry a `type` and a client `requestId`; query responses supply a connection-local `queryId`. Each connection owns its filters and match list.
+
+| Message | Behavior |
+| --- | --- |
+| `capture` | Server announces the event count and `complete: true` for the recorded file; sends no rows. |
+| `query` | Replace search/filter criteria; return a query ID and matching count, not the full match list. |
+| `rows` | Request a match-index `start` and `limit` of 1–256; return only that window's full decoded rows. |
+| `seek` | Find the next/previous matching row, optionally with the selected FD; return its match index and row, including when it is uncached. |
+| `error` | Reject malformed requests, invalid patterns, or stale query IDs without returning stale row data. |
+
+Filter changes invalidate outstanding results; rapid scrolling replaces viewport demand rather than queuing every intermediate range. Uploading or dropping a local file disconnects the server-backed capture and uses local/offline browsing. A connection failure is shown in the viewer; reload to reconnect.
+
+Stable event IDs and the capture/query/window separation let a future live-input producer reuse this transport without changing row rendering. Live piped input and append notifications are not implemented yet.
+
 ## Rendering and verification
 
 The application declares local `streaky/template` and `streaky/http-server` dependencies. Their explicit consumers generate the template engine factory and class-bound HTTP adapter at build time; generated source stays under `.trn/`.
 
-The HTML template retains normal autoescaping for text such as the title. The trace is encoded as a JSON string with `/core/documents::make-document-string`, then every `<` is escaped as `\u003c` before that JSON is inserted with `|safe` in the script element. This keeps control characters, Unicode, quotes, template delimiters, and HTML-looking trace data intact without allowing a trace to close the script element. CSS and JavaScript are trusted, compiled includes, not trace-supplied markup.
+The HTML template retains normal autoescaping for text such as the title. In offline export only, the trace is encoded as a JSON string with `/core/documents::make-document-string`, then every `<` is escaped as `\u003c` before that JSON is inserted with `|safe` in the script element. Served mode assigns an empty source string instead. Both paths keep trace data out of executable markup; row rendering uses text escaping. CSS and JavaScript are trusted, compiled includes, not trace-supplied markup.
 
-The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, and the build effect required by the HTTP dependency.
+The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, threaded HTTP workers, and the build effect required by the HTTP dependency.
 
-Run the focused rendering, parser, and real-HTTP suites from this directory after building the consumers and viewer:
+Run the focused rendering/decoding, parser, and real HTTP/WebSocket suites from this directory after building the consumers and viewer:
 
 ```bash
 ../../target/release/terrane test .
@@ -142,8 +165,8 @@ Processes may exit or spawn while this list is being assembled; that is normal. 
 - **Search** matches raw trace source, syscall arguments, and quoted payloads. Choose case-sensitive literal matching or regular expressions.
 - **Filters** combine PID, FD, syscall (including a `read*`-style suffix wildcard), and I/O-only selection.
 - **Select an event** to inspect its text, escaped, hexadecimal, and exact raw-source representations. A payload marked as truncated is not presented as complete.
-- **Keyboard:** `j`/`k` move through events; `n`/`N` move through search matches; `[`/`]` move between events on the selected descriptor; `/` focuses search.
+- **Keyboard navigation** uses arrows or `j`/`k` for rows, `n`/`N` for search matches, `[`/`]` for matching descriptors, and `/` to focus search. Descriptor navigation spans uncached rows in served captures.
 
 ## Current scope
 
-The current implementation explores captured traces over a keyed HTTP page (loopback by default, with configurable LAN binding) or an explicit HTML export. Live stdin ingestion, launching `strace`, and WebSocket updates are not implemented. The reusable `strace-format/` library, CLI/HTTP/rendering code in `src/`, and browser templates remain separate so those future capabilities can reuse the same trace model.
+The current implementation explores recorded traces using on-demand WebSocket delivery behind a keyed HTTP page (loopback by default, configurable LAN binding), or a self-contained offline HTML export. The server still keeps the recorded capture in memory. Live stdin ingestion, launching `strace`, and live append notifications are not implemented. The transport separates capture state, queries, and row windows so a future live producer can reuse it.

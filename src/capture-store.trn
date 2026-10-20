@@ -1,0 +1,159 @@
+namespace strace-viewer
+
+from /core/collections import list
+from /core/documents import document-value, document-map-entries, make-document-map, make-document-list, make-document-string, make-document-integer, make-document-bool, make-document-none
+from /core/errors import throwable
+from /deps/regress import Regex as regular-expression
+
+class capture-request-error implements throwable
+    message string = ''
+    function construct; message string
+        this.message = message
+    function render string;
+        return this.message
+
+function request-field document-value; request document-value, name string, kind string
+    field = request.field; name
+    if field.failed or field.value.kind != kind
+        throw capture-request-error; 'Expected ' + kind + ' field: ' + name
+    return field.value
+
+function request-int int; request document-value, name string
+    value = request-field; request, name, 'integer'
+    number int = value.scalar.radix; 10
+    return number
+
+function request-text string; request document-value, name string
+    value = request-field; request, name, 'string'
+    return value.scalar
+
+function request-bool bool; request document-value, name string
+    value = request-field; request, name, 'bool'
+    return value.scalar == 'true'
+
+function json-int document-value; number int
+    encoded = make-document-integer; (number.to-string;)
+    return encoded.value
+
+function message-fields document-map-entries; kind string, request-id int
+    fields = instance document-map-entries;
+    fields.append; 'type', (make-document-string; kind)
+    fields.append; 'requestId', (json-int; request-id)
+    return fields
+
+function row-document document-value; row ref capture-row
+    fields = instance document-map-entries;
+    fields.append; 'id', (json-int; row.id)
+    fields.append; 'lineNumber', (json-int; row.line-number)
+    fields.append; 'raw', (make-document-string; row.raw)
+    fields.append; 'status', (make-document-string; row.status)
+    fields.append; 'syscall', (make-document-string; row.syscall)
+    fields.append; 'args', (make-document-string; row.args)
+    fields.append; 'result', (make-document-string; row.result)
+    fields.append; 'actual', (make-document-string; row.actual)
+    fields.append; 'pid', (make-document-string; row.pid)
+    fields.append; 'timestamp', (make-document-string; row.timestamp)
+    fields.append; 'duration', (make-document-string; row.duration)
+    fields.append; 'fd', (make-document-string; row.fd)
+    fields.append; 'payload', (make-document-string; row.payload)
+    fields.append; 'truncated', (make-document-bool; row.truncated)
+    encoded = make-document-map; fields
+    return encoded.value
+
+class capture-query
+    private search string = ''
+    private sensitive bool = false
+    private pid string = ''
+    private fd string = ''
+    private syscall string = ''
+    private prefix bool = false
+    private io-only bool = false
+    private expression regular-expression
+
+    function construct; request document-value
+        this.search = request-text; request, 'search'
+        this.sensitive = request-bool; request, 'caseSensitive'
+        this.pid = request-text; request, 'pid'
+        this.fd = request-text; request, 'fd'
+        this.syscall = request-text; request, 'syscall'
+        this.prefix = this.syscall.contains.end; '*'
+        if this.prefix
+            this.syscall = this.syscall.trim.end; '*'
+        this.io-only = request-bool; request, 'ioOnly'
+        regex = request-bool; request, 'regex'
+        pattern = this.search
+        if not regex
+            pattern = pattern.replace; (list; '\\', '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|'), (list; '\\\\', '\\^', '\\$', '\\.', '\\*', '\\+', '\\?', '\\(', '\\)', '\\[', '\\]', '\\{', '\\}', '\\|')
+        flags string = ''
+        if not this.sensitive
+            flags = 'i'
+        this.expression = regular-expression::with_flags; pattern, flags
+
+    function matches bool; row ref capture-row
+        if this.pid != '' and row.pid != this.pid
+            return false
+        if this.fd != '' and row.fd != this.fd
+            return false
+        if this.syscall != '' or this.io-only
+            syscall = (row.syscall.trim.start; '!').trim.start; '*'
+            if this.syscall != ''
+                if this.prefix
+                    if not (syscall.contains.start; this.syscall)
+                        return false
+                else if syscall != this.syscall
+                    return false
+            if this.io-only and not (syscall == 'read' or syscall == 'write' or syscall == 'pread64' or syscall == 'pwrite64' or syscall == 'readv' or syscall == 'writev' or syscall == 'recv' or syscall == 'recvfrom' or syscall == 'recvmsg' or syscall == 'send' or syscall == 'sendto' or syscall == 'sendmsg')
+                return false
+        if this.search == ''
+            return true
+        found = this.expression.find; row.raw
+        return found != none
+
+class capture-store
+    private rows list of capture-row
+
+    function construct; source string
+        decoder = instance row-decoder;
+        line-number int = 0
+        for raw in (source.split; '\n')
+            line-number++
+            if (raw.trim;) != ''
+                this.rows.append; (decoder.decode; this.rows.length, line-number, raw)
+
+    function total int;
+        return this.rows.length
+
+    function query list of int; filter capture-query
+        matches list of int = list;
+        index int = 0
+        while index < this.rows.length
+            if filter.matches; (ref this.rows[index])
+                matches.append; index
+            index++
+        return matches
+
+    function window document-value; matches ref (list of int), start int, limit int
+        rows list of document-value = list;
+        index = start
+        while index < matches.length and index - start < limit
+            rows.append; (row-document; (ref this.rows[matches[index]]))
+            index++
+        encoded = make-document-list; rows
+        return encoded.value
+
+    function seek document-value; matches ref (list of int), start int, direction int, fd string, request-id int, query-id int
+        index = start + direction
+        result-index int = -1
+        row = make-document-none;
+        while index >= 0 and index < matches.length
+            if fd == '' or this.rows[matches[index]].fd == fd
+                result-index = index
+                row = row-document; (ref this.rows[matches[index]])
+                break
+            index = index + direction
+        fields = message-fields; 'seek', request-id
+        fields.append; 'queryId', (json-int; query-id)
+        fields.append; 'index', (json-int; result-index)
+        fields.append; 'row', row
+        encoded = make-document-map; fields
+        return encoded.value

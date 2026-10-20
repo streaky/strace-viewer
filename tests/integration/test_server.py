@@ -11,6 +11,8 @@ import tempfile
 import unittest
 from urllib.parse import parse_qs, urlsplit
 
+from websocket_client import WebSocket
+
 
 BINARY = Path(sys.argv.pop(1)).resolve() if len(sys.argv) > 1 else None
 PROJECT = Path(__file__).resolve().parents[2]
@@ -25,9 +27,9 @@ def config_environment(root):
 
 
 @contextmanager
-def running_viewer(directory, environment, *options):
+def running_viewer(directory, environment, *options, trace=TRACE):
     process = subprocess.Popen(
-        [str(BINARY), *options, str(TRACE)], cwd=directory, env=environment,
+        [str(BINARY), *options, str(trace)], cwd=directory, env=environment,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
     try:
@@ -81,7 +83,7 @@ class ViewerServerTests(unittest.TestCase):
         status, headers, body = self.request(self.target)
         self.assertEqual(status, 200)
         self.assertTrue(headers["content-type"].startswith("text/html"))
-        self.assertIn(b"POST /api/login", body)
+        self.assertNotIn(b"POST /api/login", body)
         self.assertEqual(headers["cache-control"], "no-store")
         self.assertEqual(headers["referrer-policy"], "no-referrer")
         status, head_headers, head_body = self.request(self.target, "HEAD")
@@ -98,14 +100,72 @@ class ViewerServerTests(unittest.TestCase):
                 self.assertNotIn(b"POST /api/login", body)
         self.assertEqual(self.request("/", "HEAD")[0], 403)
 
-    def test_explicit_html_export_matches_served_page(self):
+    def test_explicit_html_export_remains_self_contained(self):
         output = Path(self.runtime.name) / "export.html"
         exported = subprocess.run(
             [str(BINARY), str(TRACE), str(output)], cwd=self.runtime.name, env=self.environment,
             capture_output=True, text=True, timeout=30,
         )
         self.assertEqual(exported.returncode, 0, exported.stdout + exported.stderr)
-        self.assertEqual(output.read_bytes(), self.request(self.target)[2])
+        self.assertIn(b"POST /api/login", output.read_bytes())
+        self.assertNotIn(b"POST /api/login", self.request(self.target)[2])
+
+    def test_queries_filter_globally_and_reject_stale_or_invalid_requests(self):
+        query = dict(type="query", requestId=1, search="", caseSensitive=False,
+                     regex=False, pid="", fd="", syscall="", ioOnly=False)
+        with WebSocket(self.url, self.key) as peer, WebSocket(self.url, self.key) as independent:
+            self.assertEqual(peer.receive()["total"], 3)
+            independent.receive()
+            self.assertEqual(peer.exchange(query)["count"], 3)
+            filtered = peer.exchange(dict(query, requestId=2, search="(?<=HTTP/1.1 )200", regex=True))
+            self.assertEqual(filtered["count"], 1)
+            rows = peer.exchange(dict(type="rows", requestId=3, queryId=2, start=0, limit=1))["rows"]
+            self.assertEqual([(row["id"], row["syscall"], row["fd"]) for row in rows], [(1, "read", "7")])
+            self.assertIn("HTTP/1.1 200 OK", rows[0]["payload"])
+            self.assertEqual(independent.exchange(query)["count"], 3)
+            self.assertEqual(peer.exchange(dict(type="rows", requestId=4, queryId=1, start=0, limit=1))["type"], "error")
+            self.assertEqual(peer.exchange(dict(query, requestId=5, search="[", regex=True))["type"], "error")
+            self.assertEqual(peer.exchange(dict(type="rows", requestId=6, queryId=2, start=0, limit=1))["type"], "error")
+            filtered = peer.exchange(dict(query, requestId=7, pid="4182", fd="7", syscall="w*", ioOnly=True))
+            self.assertEqual(filtered["count"], 1)
+            self.assertEqual(peer.exchange(dict(type="rows", requestId=8, queryId=7, start=0, limit=257))["type"], "error")
+            self.assertEqual(peer.exchange(dict(type="rows", requestId=9, queryId=7, start=0, limit=1))["rows"][0]["id"], 0)
+            self.assertEqual(peer.exchange(dict(query, requestId=10, search="post", caseSensitive=True))["count"], 0)
+            self.assertEqual(peer.exchange(dict(query, requestId=11, search="post"))["count"], 1)
+        # TCP close without a WebSocket close frame must not terminate serving.
+        self.assertEqual(self.request(self.target)[0], 200)
+        with self.assertRaises(AssertionError):
+            with WebSocket(self.url, "wrong"):
+                pass
+
+    def test_window_bounds_and_descriptor_seek_beyond_fetched_rows(self):
+        with tempfile.TemporaryDirectory(prefix="strace-viewer-window-") as directory:
+            trace = Path(directory) / "window.trace"
+            payload = "large café </ScRiPt> " + "x" * 65536 + r'\"'
+            lines = [f'42 write({7 if index in (0, 299) else 8}, "{payload if index == 299 else index}", 1) = 1' for index in range(300)]
+            trace.write_text("\n" + "\n".join(lines))
+            with running_viewer(directory, config_environment(Path(directory)), trace=trace) as url:
+                key = parse_qs(url.query)["key"][0]
+                with WebSocket(url, key) as peer:
+                    self.assertEqual(peer.receive()["total"], 300)
+                    query = dict(type="query", requestId=1, search="", caseSensitive=False, regex=False, pid="", fd="", syscall="", ioOnly=False)
+                    self.assertEqual(peer.exchange(query)["count"], 300)
+                    rows = peer.exchange(dict(type="rows", requestId=2, queryId=1, start=0, limit=2))["rows"]
+                    self.assertEqual([row["id"] for row in rows], [0, 1])
+                    self.assertEqual(rows[0]["lineNumber"], 2)
+                    seek = peer.exchange(dict(type="seek", requestId=3, queryId=1, **{"from": 0}, direction=1, fd="7"))
+                    self.assertEqual((seek["index"], seek["row"]["id"]), (299, 299))
+                    self.assertEqual(seek["row"]["payload"], payload)
+                    tail = peer.exchange(dict(type="rows", requestId=4, queryId=1, start=299, limit=256))["rows"]
+                    self.assertEqual([row["id"] for row in tail], [299])
+                    self.assertEqual(tail[0]["raw"], lines[299])
+                    self.assertEqual(peer.exchange(dict(type="rows", requestId=5, queryId=1, start=300, limit=1))["rows"], [])
+                    invalid = dict(type="seek", requestId=6, queryId=1, **{"from": 0}, direction=0, fd="")
+                    self.assertEqual(peer.exchange(invalid)["type"], "error")
+                    del invalid["fd"]
+                    self.assertEqual(peer.exchange(dict(invalid, requestId=7, direction=1))["type"], "error")
+                    recovered = peer.exchange(dict(type="rows", requestId=8, queryId=1, start=0, limit=1))
+                    self.assertEqual(recovered["rows"][0]["id"], 0)
 
     def test_invalid_argument_counts_do_not_start_server(self):
         for arguments in [[], [str(TRACE), "output.html", "extra"]]:
@@ -143,7 +203,7 @@ class ViewerServerTests(unittest.TestCase):
                             connection.request("GET", url.path + "?" + url.query)
                             response = connection.getresponse()
                             self.assertEqual(response.status, 200)
-                            self.assertIn(b"POST /api/login", response.read())
+                            self.assertNotIn(b"POST /api/login", response.read())
                         finally:
                             connection.close()
 
@@ -168,7 +228,7 @@ class ViewerServerTests(unittest.TestCase):
                         capture_output=True, text=True, timeout=30,
                     )
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(output.read_bytes(), self.request(self.target)[2])
+            self.assertIn(b"POST /api/login", output.read_bytes())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,84 @@
+namespace strace-viewer
+
+from /core/collections import list
+from /core/documents import make-document-map, make-document-bool, make-document-string
+from /core/documents/json import parse-json, default-json-options
+from /core/errors import throwable
+from /streaky/http-server import websocket-session
+
+# The capture is shared; match lists and query IDs belong to a single connection.
+# No shared-store guard survives a send/receive await.
+async function stream-capture none throws throwable; store shared ref capture-store, session websocket-session
+    initial = message-fields; 'capture', 0
+    initial.append; 'total', (json-int; (store.total;))
+    initial.append; 'complete', (make-document-bool; true)
+    announcement = make-document-map; initial
+    await session.send-text; announcement.value.encoded
+    matches list of int = list;
+    query-id int = -1
+    closed bool = false
+    while not closed
+        event = await session.receive;
+        if event.kind == 'closed'
+            closed = true
+        text = event.text
+        if text != none
+            request-id int = -1
+            response string = ''
+            replacing-query bool = false
+            try
+                parsed = parse-json; text, (default-json-options;)
+                if parsed.failed or parsed.value.kind != 'map'
+                    throw capture-request-error; 'Expected a JSON request object'
+                request = parsed.value
+                request-id = request-int; request, 'requestId'
+                if request-id < 0
+                    throw capture-request-error; 'requestId must be nonnegative'
+                kind = request-text; request, 'type'
+                if kind == 'query'
+                    replacing-query = true
+                    query = instance capture-query; request
+                    matches = store.query; move query
+                    query-id = request-id
+                    fields = message-fields; 'query', request-id
+                    fields.append; 'queryId', (json-int; query-id)
+                    fields.append; 'total', (json-int; (store.total;))
+                    fields.append; 'count', (json-int; matches.length)
+                    encoded = make-document-map; fields
+                    response = encoded.value.encoded
+                else if kind == 'rows' or kind == 'seek'
+                    requested-query = request-int; request, 'queryId'
+                    if query-id < 0 or requested-query != query-id
+                        throw capture-request-error; 'Query is no longer current'
+                    if kind == 'rows'
+                        start = request-int; request, 'start'
+                        limit = request-int; request, 'limit'
+                        if start < 0 or limit < 1 or limit > 256
+                            throw capture-request-error; 'Rows require start >= 0 and limit between 1 and 256'
+                        rows = store.window; (ref matches), start, limit
+                        fields = message-fields; 'rows', request-id
+                        fields.append; 'queryId', (json-int; query-id)
+                        fields.append; 'start', (json-int; start)
+                        fields.append; 'rows', rows
+                        encoded = make-document-map; fields
+                        response = encoded.value.encoded
+                    else
+                        position = request-int; request, 'from'
+                        direction = request-int; request, 'direction'
+                        fd = request-text; request, 'fd'
+                        if (direction != -1 and direction != 1) or position < -1 or position > matches.length
+                            throw capture-request-error; 'Invalid seek position or direction'
+                        sought = store.seek; (ref matches), position, direction, fd, request-id, query-id
+                        response = sought.encoded
+                else
+                    throw capture-request-error; 'Unknown capture request type'
+            catch throwable as error
+                # A rejected replacement cannot leave the previous query accessible.
+                if replacing-query
+                    query-id = -1
+                fields = message-fields; 'error', request-id
+                fields.append; 'message', (make-document-string; error.message)
+                encoded = make-document-map; fields
+                response = encoded.value.encoded
+            await session.send-text; response
+    return none

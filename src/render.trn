@@ -12,4 +12,12 @@ public function render-page string; source string
     engine = make-template-engine;
     engine.assign; 'title', (text-value; 'strace-viewer')
     engine.assign; 'source', (text-value; source-json)
+    engine.assign; 'remote', (text-value; 'false')
+    return engine.fetch; 'index.html'
+
+function render-remote-page string;
+    engine = make-template-engine;
+    engine.assign; 'title', (text-value; 'strace-viewer')
+    engine.assign; 'source', (text-value; '""')
+    engine.assign; 'remote', (text-value; 'true')
     return engine.fetch; 'index.html'
