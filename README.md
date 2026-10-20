@@ -96,7 +96,7 @@ The application declares local `streaky/template` and `streaky/http-server` depe
 
 The HTML template retains normal autoescaping for text such as the title. In offline export only, the trace is encoded as a JSON string with `/core/documents::make-document-string`, then every `<` is escaped as `\u003c` before that JSON is inserted with `|safe` in the script element. Served mode assigns an empty source string instead. Both paths keep trace data out of executable markup; row rendering uses text escaping. CSS and JavaScript are trusted, compiled includes, not trace-supplied markup.
 
-The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, clocks for HTTP accept-retry backoff, and the build effect required by the HTTP dependency.
+The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, clocks for HTTP accept-retry backoff, logging for accept-error diagnostics, and the build effect required by the HTTP dependency.
 
 Run the focused rendering/decoding, parser, and real HTTP/WebSocket suites from this directory after building the consumers and viewer:
 
