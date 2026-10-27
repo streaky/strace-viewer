@@ -64,7 +64,6 @@ async function serve-viewer; source string, address string
     app = app.mount; '/', (instance annotated-group0; (instance viewer-site; page, access-key))
     handler async function from websocket-session to none throws throwable = async function; session websocket-session
         await stream-capture; store, move session
-        return none
     app = app.websocket; '/events/' + access-key, handler
     listener = await listen-tcp; address
     print; 'strace-viewer: http://' + listener.local-address + '/?key=' + access-key
