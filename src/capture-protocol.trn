@@ -55,7 +55,7 @@ async function stream-capture none throws throwable; store shared ref capture-st
                         limit = request-int; request, 'limit'
                         if start < 0 or limit < 1 or limit > 256
                             throw capture-request-error; 'Rows require start >= 0 and limit between 1 and 256'
-                        rows = store.window; (ref matches), start, limit
+                        rows = store.window; matches, start, limit
                         fields = message-fields; 'rows', request-id
                         fields.append; 'queryId', (json-int; query-id)
                         fields.append; 'start', (json-int; start)
@@ -68,7 +68,7 @@ async function stream-capture none throws throwable; store shared ref capture-st
                         fd = request-text; request, 'fd'
                         if (direction != -1 and direction != 1) or position < -1 or position > matches.length
                             throw capture-request-error; 'Invalid seek position or direction'
-                        sought = store.seek; (ref matches), position, direction, fd, request-id, query-id
+                        sought = store.seek; matches, position, direction, fd, request-id, query-id
                         response = sought.encoded
                 else
                     throw capture-request-error; 'Unknown capture request type'

@@ -127,7 +127,7 @@ class capture-store
         matches list of int = list;
         index int = 0
         while index < this.rows.length
-            if filter.matches; (ref this.rows[index])
+            if filter.matches; this.rows[index]
                 matches.append; index
             index++
         return matches
@@ -136,7 +136,7 @@ class capture-store
         rows list of document-value = list;
         index = start
         while index < matches.length and index - start < limit
-            rows.append; (row-document; (ref this.rows[matches[index]]))
+            rows.append; (row-document; this.rows[matches[index]])
             index++
         encoded = make-document-list; rows
         return encoded.value
@@ -148,7 +148,7 @@ class capture-store
         while index >= 0 and index < matches.length
             if fd == '' or this.rows[matches[index]].fd == fd
                 result-index = index
-                row = row-document; (ref this.rows[matches[index]])
+                row = row-document; this.rows[matches[index]]
                 break
             index = index + direction
         fields = message-fields; 'seek', request-id
