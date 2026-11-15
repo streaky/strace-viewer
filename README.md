@@ -11,8 +11,8 @@ By default the viewer serves only this machine over loopback and prints a URL co
 Build the HTTP and template consumers, then build the native executable and serve a trace:
 
 ```bash
-TERRANE="$PWD/../../target/release/terrane" sh ../../packages/http-server/build-consumer.sh
-viewer=$(../../target/release/terrane build .)
+TERRANE="$(command -v terrane)" sh ../../packages/http-server/build-consumer.sh
+viewer=$(terrane build .)
 "$viewer" trace.log
 ```
 
@@ -27,7 +27,7 @@ The viewer renders a small overscanned window of rows, highlights matches, and s
 For iterative Terrane development, the equivalent one-shot command is:
 
 ```bash
-../../target/release/terrane run . -- trace.log
+terrane run . -- trace.log
 ```
 
 The viewer also supports drag-and-drop and local file selection. Served captures are delivered on demand; explicit HTML export embeds a capture when a portable offline document is needed.
@@ -101,8 +101,8 @@ The Terrane sources use string `+` for composition and typed empty collections i
 Run the focused rendering/decoding, parser, and real HTTP/WebSocket suites from this directory after building the consumers and viewer:
 
 ```bash
-../../target/release/terrane test .
-../../target/release/terrane test strace-format
+terrane test .
+terrane test strace-format
 python tests/integration/test_server.py "$viewer"
 ```
 
