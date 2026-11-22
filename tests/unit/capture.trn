@@ -23,3 +23,16 @@ function test-decoder-preserves-nested-quoted-and-incomplete-calls;
     malformed = decoder.decode; 3, 5, '42 write(7, nested([1, 2}) = 1'
     assert-equal-string; malformed.status, 'raw'
     assert-equal-string; malformed.raw, '42 write(7, nested([1, 2}) = 1'
+
+function test-decoder-keeps-ascii-tokens-and-utf8-payloads;
+    decoder = instance row-decoder;
+    row = decoder.decode; 0, 1, "42\u{feff}write(7, \"café\\\"x\", 7) = -1 ENOENT"
+    assert-equal-string; row.status, 'parsed'
+    assert-equal-string; row.pid, '42'
+    assert-equal-string; row.payload, 'café\"x'
+    assert-equal-string; row.actual, '-1'
+    assert-equal-string; row.duration, ''
+    unicode-name = decoder.decode; 1, 2, '42 writé(7) = 1'
+    assert-equal-string; unicode-name.status, 'raw'
+    unicode-pid = decoder.decode; 2, 3, '٤٢ write(7) = 1'
+    assert-equal-string; unicode-pid.status, 'raw'

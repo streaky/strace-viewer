@@ -98,6 +98,8 @@ The HTML template retains normal autoescaping for text such as the title. In off
 
 The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, clocks for HTTP accept-retry backoff, logging for accept-error diagnostics, and the build effect required by the HTTP dependency.
 
+Trace-row decoding compiles its fixed patterns once with `/core/regex` and reads captures directly. The decoder keeps the trace grammar's ASCII identifiers and numbers; user-entered server searches still use `regress` for ECMAScript compatibility.
+
 Run the focused rendering/decoding, parser, and real HTTP/WebSocket suites from this directory after building the consumers and viewer:
 
 ```bash
