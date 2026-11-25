@@ -1,7 +1,15 @@
 namespace strace-viewer
 
 from /core/collections import list
-from /core/documents import document-value, document-map-entries, make-document-map, make-document-list, make-document-string, make-document-integer, make-document-bool, make-document-none
+from /core/documents import
+    document-value,
+    document-map-entries,
+    make-document-map,
+    make-document-list,
+    make-document-string,
+    make-document-integer,
+    make-document-bool,
+    make-document-none
 from /core/errors import throwable
 from /deps/regress import
     Regex as regular-expression,
@@ -103,7 +111,9 @@ class capture-query
         if this.fd != '' and row.fd != this.fd
             return false
         if this.syscall != '' or this.io-only
-            syscall = (row.syscall.trim.start; '!').trim.start; '*'
+            syscall = row.syscall
+                .trim.start; '!'
+                .trim.start; '*'
             if this.syscall != ''
                 if this.prefix
                     if not (syscall.contains.start; this.syscall)
@@ -123,7 +133,7 @@ class capture-store
     function construct; source string
         decoder = instance row-decoder;
         line-number int = 0
-        for raw in (source.split; '\n')
+        for raw in (source.split; "\n")
             line-number++
             if (raw.trim;) != ''
                 this.rows.append; (decoder.decode; this.rows.length, line-number, raw)

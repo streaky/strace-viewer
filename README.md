@@ -95,11 +95,15 @@ The application declares local `streaky/template` and `streaky/http-server` depe
 
 The HTML template retains normal autoescaping for text such as the title. In offline export only, the trace is encoded as a JSON string with `/core/documents::make-document-string`, then every `<` is escaped as `\u003c` before that JSON is inserted with `|safe` in the script element. Served mode assigns an empty source string instead. Both paths keep trace data out of executable markup; row rendering uses text escaping. CSS and JavaScript are trusted, compiled includes, not trace-supplied markup.
 
-The Terrane sources use string `+` for composition and typed empty collections instead of sentinel elements. Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, clocks for HTTP accept-retry backoff, logging for accept-error diagnostics, and the build effect required by the HTTP dependency.
+The Terrane sources use grouped selective imports, indented calls and leading-dot chains, and structured field-update blocks for related assignments. String composition uses `+`, and empty collections carry their types instead of sentinel elements. The stateful trace scanner and bounded paging loops remain explicit: replacing them with pipelines would not eliminate intermediate collections or simplify their control flow.
 
 Trace-row decoding compiles its fixed patterns once with `/core/regex` and reads captures directly. The decoder keeps the trace grammar's ASCII identifiers and numbers; user-entered server searches still use `regress` for ECMAScript compatibility.
 
-Run the focused rendering/decoding, parser, and real HTTP/WebSocket suites from this directory after building the consumers and viewer:
+Search configuration uses the native [`regress::Flags`](https://docs.rs/regress/0.12.0/regress/struct.Flags.html) value, retaining its defaults and setting `icase` from the case-sensitive option. This avoids allocating a flags string and routing it through a generic native string-conversion boundary.
+
+Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, clocks for HTTP accept-retry backoff, logging for accept-error diagnostics, and the build effect required by the HTTP dependency.
+
+Run the focused rendering/decoding, parser, and real HTTP/WebSocket suites from this directory after building the viewer:
 
 ```bash
 terrane test .

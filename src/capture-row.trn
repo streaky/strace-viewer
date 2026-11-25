@@ -114,7 +114,9 @@ class row-decoder
             duration string = ''
             if unfinished
                 rest = data[range; start, data.length].decode; utf8
-                args = (rest.trim.end; '<unfinished ...>').trim.end;
+                args = rest
+                    .trim.end; '<unfinished ...>'
+                    .trim.end;
             else
                 close = call-close; data, start, not resumed
                 if close < 0
@@ -127,14 +129,20 @@ class row-decoder
                 else
                     return row
                 args = data[range; start, close].decode; utf8
-            row.status = 'parsed'
-            row.syscall = syscall
+            row = {
+                status = 'parsed'
+                syscall = syscall
+            }
             if resumed
-                row.status = 'resumed'
-                row.syscall = '*' + syscall
+                row = {
+                    status = 'resumed'
+                    syscall = '*' + syscall
+                }
             if unfinished
-                row.status = 'unfinished'
-                row.syscall = '!' + syscall
+                row = {
+                    status = 'unfinished'
+                    syscall = '!' + syscall
+                }
             if first.contains; '.'
                 row.timestamp = first
             else
@@ -143,9 +151,11 @@ class row-decoder
                 row.timestamp = second
             else if second != ''
                 row.pid = second
-            row.args = args
-            row.result = result
-            row.duration = duration
+            row = {
+                args = args
+                result = result
+                duration = duration
+            }
             fd = this.descriptor.captures; args
             if fd != none
                 row.fd = group-text; fd, 1

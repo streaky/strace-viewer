@@ -1,7 +1,8 @@
 namespace strace-viewer
 
 from /core/collections import list
-from /core/process import arguments, cli-schema, parse-command-line, make-exit-status, exit
+from /core/process import
+    arguments, cli-schema, parse-command-line, make-exit-status, exit
 from /core/errors import throwable
 from /streaky/strace-format import parse-trace
 
