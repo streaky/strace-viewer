@@ -19,7 +19,7 @@ Open the URL printed in the console. Without configuration or options, the serve
 
 The `?key=...` value is a new random 12-character URL-safe string each time the server starts. Requests with a missing or incorrect key receive HTTP 403. There are no cookies or login sessions; this is a simple access gate, not an Internet-facing authentication system. Authorized pages are marked `no-store` and do not send referrers. Treat the console URL and browser history as sensitive.
 
-`terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates; changes to the consumer packages are picked up automatically by the build.
+`terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates.
 
 The viewer renders a small overscanned window of rows, highlights matches, and supports raw source inspection. HTTP serving, decoding, filters, and cross-capture navigation run in Terrane; the browser requests only the row windows it displays. Selecting an event opens a resizable inspector with a structured summary and text/hex views. Payload text is decoded when inspected and cached with the row. Text buffers open in text mode, while buffers containing binary/non-printable data default to hex; the toggle remains available for either.
 
@@ -98,8 +98,6 @@ The HTML template retains normal autoescaping for text such as the title. In off
 The Terrane sources use grouped selective imports, indented calls and leading-dot chains, and structured field-update blocks for related assignments. String composition uses `+`, and empty collections carry their types instead of sentinel elements. The stateful trace scanner and bounded paging loops remain explicit: replacing them with pipelines would not eliminate intermediate collections or simplify their control flow.
 
 Trace-row decoding compiles its fixed patterns once with `/core/regex` and reads captures directly. The decoder keeps the trace grammar's ASCII identifiers and numbers; user-entered server searches still use `regress` for ECMAScript compatibility.
-
-Search configuration uses the native [`regress::Flags`](https://docs.rs/regress/0.12.0/regress/struct.Flags.html) value, retaining its defaults and setting `icase` from the case-sensitive option. This avoids allocating a flags string and routing it through a generic native string-conversion boundary.
 
 Runtime dependencies remain compiler-owned; the application requests filesystem/process access, networking, secure entropy for the access key, clocks for HTTP accept-retry backoff, logging for accept-error diagnostics, and the build effect required by the HTTP dependency.
 

@@ -101,6 +101,7 @@ class capture-query
                     '\\\\', '\\^', '\\$', '\\.', '\\*', '\\+', '\\?', '\\(', '\\)',
                     '\\[', '\\]', '\\{', '\\}', '\\|'
                 )
+        # Preserve engine defaults and set case sensitivity without parsing a flags string.
         flags = regular-expression-flags::default;
         flags.icase = not this.sensitive
         this.expression = regular-expression::with_flags; pattern, move flags
