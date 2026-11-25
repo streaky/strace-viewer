@@ -8,10 +8,9 @@ By default the viewer serves only this machine over loopback and prints a URL co
 
 ## Build and open a captured trace
 
-Build the HTTP and template consumers, then build the native executable and serve a trace:
+Build the native executable and serve a trace. Terrane automatically prepares the selected HTTP and template consumer tools:
 
 ```bash
-TERRANE="$(command -v terrane)" sh ../../packages/http-server/build-consumer.sh
 viewer=$(terrane build .)
 "$viewer" trace.log
 ```
@@ -20,7 +19,7 @@ Open the URL printed in the console. Without configuration or options, the serve
 
 The `?key=...` value is a new random 12-character URL-safe string each time the server starts. Requests with a missing or incorrect key receive HTTP 403. There are no cookies or login sessions; this is a simple access gate, not an Internet-facing authentication system. Authorized pages are marked `no-store` and do not send referrers. Treat the console URL and browser history as sensitive.
 
-`terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates, and rebuild the consumers after changing their packages.
+`terrane build` prints the native artifact path. The template consumer compiles `templates/index.html` and its CSS/JavaScript includes into the executable. The binary can run from any directory without the template files; input and output paths resolve from its working directory. Rebuild the application after editing templates; changes to the consumer packages are picked up automatically by the build.
 
 The viewer renders a small overscanned window of rows, highlights matches, and supports raw source inspection. HTTP serving, decoding, filters, and cross-capture navigation run in Terrane; the browser requests only the row windows it displays. Selecting an event opens a resizable inspector with a structured summary and text/hex views. Payload text is decoded when inspected and cached with the row. Text buffers open in text mode, while buffers containing binary/non-printable data default to hex; the toggle remains available for either.
 
@@ -92,7 +91,7 @@ Stable event IDs and the capture/query/window separation let a future live-input
 
 ## Rendering and verification
 
-The application declares local `streaky/template` and `streaky/http-server` dependencies. Their explicit consumers generate the template engine factory and class-bound HTTP adapter at build time; generated source stays under `.trn/`.
+The application declares local `streaky/template` and `streaky/http-server` dependencies and selects their exported `template` and `http` tools. Ordinary build and test commands prepare those tools automatically; no manual consumer build scripts are required. The tools generate the template engine factory and class-bound HTTP adapter at build time; generated source stays under `.trn/`.
 
 The HTML template retains normal autoescaping for text such as the title. In offline export only, the trace is encoded as a JSON string with `/core/documents::make-document-string`, then every `<` is escaped as `\u003c` before that JSON is inserted with `|safe` in the script element. Served mode assigns an empty source string instead. Both paths keep trace data out of executable markup; row rendering uses text escaping. CSS and JavaScript are trusted, compiled includes, not trace-supplied markup.
 
