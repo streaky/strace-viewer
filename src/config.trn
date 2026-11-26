@@ -32,7 +32,8 @@ function user-config-path string|none; home string, xdg-config-home string
     return none
 
 function parse-viewer-config viewer-config; source string
-    decoded = decode-typed-yaml; source, viewer-config, (default-yaml-options;), false
+    decoded = decode-typed-yaml;
+        source, viewer-config, (default-yaml-options;), false
     if decoded.failed
         diagnostic = decoded.diagnostics[0]
         throw settings-error; diagnostic.path + ': ' + diagnostic.message
@@ -49,7 +50,8 @@ function load-viewer-config viewer-config;
                 xdg-config-home = entry.value.text
     location = user-config-path; home, xdg-config-home
     if location != none
-        exists = filesystem-exists; (filesystem-capability;), (instance path; location)
+        exists = filesystem-exists;
+            (filesystem-capability;), (instance path; location)
         if exists.failed
             throw settings-error; location + ': ' + exists.message
         if not exists.exists

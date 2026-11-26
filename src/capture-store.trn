@@ -1,9 +1,19 @@
 namespace strace-viewer
 
 from /core/collections import list
-from /core/documents import document-value, document-map-entries, make-document-map, make-document-list, make-document-string, make-document-integer, make-document-bool, make-document-none
+from /core/documents import
+    document-value,
+    document-map-entries,
+    make-document-map,
+    make-document-list,
+    make-document-string,
+    make-document-integer,
+    make-document-bool,
+    make-document-none
 from /core/errors import throwable
-from /deps/regress import Regex as regular-expression
+from /deps/regress import
+    Regex as regular-expression,
+    Flags as regular-expression-flags
 
 class capture-request-error implements throwable
     message string = ''
@@ -83,11 +93,18 @@ class capture-query
         regex = request-bool; request, 'regex'
         pattern = this.search
         if not regex
-            pattern = pattern.replace; (list; '\\', '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|'), (list; '\\\\', '\\^', '\\$', '\\.', '\\*', '\\+', '\\?', '\\(', '\\)', '\\[', '\\]', '\\{', '\\}', '\\|')
-        flags string = ''
-        if not this.sensitive
-            flags = 'i'
-        this.expression = regular-expression::with_flags; pattern, flags
+            pattern = pattern.replace;
+                (list;
+                    '\\', '^', '$', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|'
+                ),
+                (list;
+                    '\\\\', '\\^', '\\$', '\\.', '\\*', '\\+', '\\?', '\\(', '\\)',
+                    '\\[', '\\]', '\\{', '\\}', '\\|'
+                )
+        # Preserve engine defaults and set case sensitivity without parsing a flags string.
+        flags = regular-expression-flags::default;
+        flags.icase = not this.sensitive
+        this.expression = regular-expression::with_flags; pattern, move flags
 
     function matches bool; row ref capture-row
         if this.pid != '' and row.pid != this.pid
@@ -95,7 +112,9 @@ class capture-query
         if this.fd != '' and row.fd != this.fd
             return false
         if this.syscall != '' or this.io-only
-            syscall = (row.syscall.trim.start; '!').trim.start; '*'
+            syscall = row.syscall
+                .trim.start; '!'
+                .trim.start; '*'
             if this.syscall != ''
                 if this.prefix
                     if not (syscall.contains.start; this.syscall)
@@ -115,7 +134,7 @@ class capture-store
     function construct; source string
         decoder = instance row-decoder;
         line-number int = 0
-        for raw in (source.split; '\n')
+        for raw in (source.split; "\n")
             line-number++
             if (raw.trim;) != ''
                 this.rows.append; (decoder.decode; this.rows.length, line-number, raw)
