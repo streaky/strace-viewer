@@ -101,8 +101,7 @@ class row-decoder
         if found != none
             whole = found.group; 0
             # Group zero always participates, but group(index) returns an optional range.
-            # The backend currently emits bytes.end as i128, not as a Terrane Int.
-            start int128 = 0
+            start int = 0
             if whole != none
                 start = whole.bytes.end
             else
